@@ -2,17 +2,10 @@
 *.o
 *.ko
 
-# Libraries
-*.lib
-*.a
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
+# Linux Kernel build generated
+*.ko.cmd
+*.o.cmd
+*.symvers
+*.mod.c
+*.order
+.tmp_versions/

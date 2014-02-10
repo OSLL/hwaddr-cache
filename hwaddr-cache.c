@@ -21,11 +21,7 @@ static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 static void hwaddr_free(struct hwaddr_entry *entry)
 {
-	printk(KERN_INFO "freeing entry for %d.%d.%d.%d\n",
-				(entry->remote & 0x000000ff),
-				(entry->remote & 0x0000ff00) >> 8,
-				(entry->remote & 0x00ff0000) >> 16,
-				(entry->remote & 0xff000000) >> 24);
+	printk(KERN_INFO "freeing entry for %pI4\n", &entry->remote);
 			
 	kmem_cache_free(hwaddr_cache, entry);
 }
@@ -122,11 +118,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 
 	up_write(&hwaddr_hash_table_rwsem);
 
-	printk(KERN_INFO "create entry for remote ip = %d.%d.%d.%d\n",
-				(remote & 0x000000ff),
-				(remote & 0x0000ff00) >> 8,
-				(remote & 0x00ff0000) >> 16,
-				(remote & 0xff000000) >> 24);
+	printk(KERN_INFO "create entry for remote ip = %pI4\n", &remote);
 
 	return entry;
 }
