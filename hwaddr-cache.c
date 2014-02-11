@@ -247,7 +247,7 @@ static void __exit hwaddr_cache_cleanup(void)
 	nf_unregister_hook(&hwaddr_hook);
 	kmem_cache_destroy(hwaddr_cache);
 
-	printk(KERN_INFO "hsaddr-cache module unloaded\n");
+	printk(KERN_INFO "hwaddr-cache module unloaded\n");
 }
 
 module_init(hwaddr_cache_init);
