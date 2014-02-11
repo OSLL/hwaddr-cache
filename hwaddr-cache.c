@@ -1,16 +1,17 @@
-#include <linux/module.h>
+#include <linux/hashtable.h>
 #include <linux/init.h>
+#include <linux/module.h>
+#include <linux/rwsem.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/rwsem.h>
-#include <linux/hashtable.h>
 
+#include <linux/if_arp.h>
+#include <linux/if_ether.h>
+#include <linux/inetdevice.h>
+#include <linux/ip.h>
+#include <linux/netdevice.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
-#include <linux/netdevice.h>
-#include <linux/if_ether.h>
-#include <linux/if_arp.h>
-#include <linux/ip.h>
 
 #include "hwaddr-cache.h"
 
@@ -177,8 +178,12 @@ static unsigned int hwaddr_hook_fn(unsigned int hooknum,
 									struct net_device const *out,
 									int (*okfn)(struct sk_buff *))
 {
+	struct net_device * target = NULL;
 	struct ethhdr * lhdr = NULL;
 	struct iphdr * nhdr = NULL;
+
+	if (!in)
+		return NF_ACCEPT;
 
 	if (in->type != ARPHRD_ETHER && in->type != ARPHRD_IEEE802)
 		return NF_ACCEPT;
@@ -188,9 +193,11 @@ static unsigned int hwaddr_hook_fn(unsigned int hooknum,
 
 	lhdr = eth_hdr(skb);
 	nhdr = ip_hdr(skb);
+	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 
-	hwaddr_put(hwaddr_create(nhdr->saddr, nhdr->daddr,
-								lhdr->h_source, ETH_ALEN));
+	if (target == in)
+		hwaddr_put(hwaddr_create(nhdr->saddr, nhdr->daddr,
+									lhdr->h_source, ETH_ALEN));
 
 	return NF_ACCEPT;
 }

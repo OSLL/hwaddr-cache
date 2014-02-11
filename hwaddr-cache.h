@@ -5,8 +5,8 @@
 #define DESCRIPTION		"network hardware address cache"
 #define LICENSE			"Dual MIT/GPL"
 
-#include <uapi/linux/netdevice.h>
 #include <linux/kernel.h>
+#include <uapi/linux/netdevice.h>
 
 struct hwaddr_entry
 {
