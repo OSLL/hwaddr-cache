@@ -165,6 +165,7 @@ static void hwaddr_cache_release(void)
 		hwaddr_put(entry);
 	}
 	write_unlock(&hwaddr_hash_table_lock);
+	kmem_cache_destroy(hwaddr_cache);
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
@@ -262,7 +263,7 @@ static int __init hwaddr_cache_init(void)
 	if (rc)
 	{
 		printk(KERN_ERR "cannot register netfilter input hook\n");
-		kmem_cache_destroy(hwaddr_cache);
+		hwaddr_cache_release();
 		return rc;
 	}
 
@@ -272,7 +273,6 @@ static int __init hwaddr_cache_init(void)
 		printk(KERN_ERR "cannot register netfilter output hook\n");
 		nf_unregister_hook(&hwaddr_in_hook);
 		hwaddr_cache_release();
-		kmem_cache_destroy(hwaddr_cache);
 		return rc;
 	}
 
@@ -283,12 +283,9 @@ static int __init hwaddr_cache_init(void)
 
 static void __exit hwaddr_cache_cleanup(void)
 {
-
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
-
 	hwaddr_cache_release();
-	kmem_cache_destroy(hwaddr_cache);
 
 	pr_debug("hwaddr-cache module unloaded\n");
 }
