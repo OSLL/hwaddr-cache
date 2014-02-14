@@ -171,11 +171,11 @@ static void hwaddr_cache_release(void)
  * Interface changed in kernel version 3.13 to:
  * static unsigned int hwaddr_hook_fn(struct nf_hook_ops const *ops,
  **/
-static unsigned int hwaddr_hook_fn(unsigned int hooknum,
-									struct sk_buff *skb,
-									struct net_device const *in,
-									struct net_device const *out,
-									int (*okfn)(struct sk_buff *))
+static unsigned int hwaddr_in_hook_fn(unsigned int hooknum,
+										struct sk_buff *skb,
+										struct net_device const *in,
+										struct net_device const *out,
+										int (*okfn)(struct sk_buff *))
 {
 	struct net_device * target = NULL;
 	struct ethhdr * lhdr = NULL;
@@ -201,8 +201,8 @@ static unsigned int hwaddr_hook_fn(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
-static struct nf_hook_ops hwaddr_hook = {
-	.hook = hwaddr_hook_fn,
+static struct nf_hook_ops hwaddr_in_hook = {
+	.hook = hwaddr_in_hook_fn,
 	.owner = THIS_MODULE,
 	.pf = NFPROTO_IPV4,
 	.hooknum = NF_INET_LOCAL_IN,
@@ -226,7 +226,7 @@ static int __init hwaddr_cache_init(void)
 		return -ENOMEM;
 	}
 
-	rc = nf_register_hook(&hwaddr_hook);
+	rc = nf_register_hook(&hwaddr_in_hook);
 	if (rc)
 	{
 		printk(KERN_ERR "cannot register netfilter hook\n");
@@ -243,7 +243,7 @@ static void __exit hwaddr_cache_cleanup(void)
 {
 	hwaddr_cache_release();
 
-	nf_unregister_hook(&hwaddr_hook);
+	nf_unregister_hook(&hwaddr_in_hook);
 	kmem_cache_destroy(hwaddr_cache);
 
 	printk(KERN_INFO "hwaddr-cache module unloaded\n");
