@@ -1,7 +1,7 @@
 #include <linux/hashtable.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/rwsem.h>
+#include <linux/rwlock.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/version.h>
@@ -17,9 +17,20 @@
 #include "hwaddr-cache.h"
 
 static struct kmem_cache *hwaddr_cache;
-static DECLARE_RWSEM(hwaddr_hash_table_rwsem);
+static rwlock_t hwaddr_hash_table_lock
+			= __RW_LOCK_UNLOCKED(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
+static void init_hwaddr_entry(struct hwaddr_entry *entry,
+								__be32 remote,
+								__be32 local,
+								unsigned char const *ha,
+								unsigned int ha_len)
+{
+	entry->remote = remote;
+	entry->local = local;
+	memcpy(entry->ha, ha, ha_len);
+}
 
 static void hwaddr_free(struct hwaddr_entry *entry)
 {
@@ -31,7 +42,7 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 static struct hwaddr_entry * hwaddr_alloc(__be32 remote,
 											__be32 local,
 											unsigned char const *ha,
-											unsigned ha_len)
+											unsigned int ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -39,14 +50,11 @@ static struct hwaddr_entry * hwaddr_alloc(__be32 remote,
 		return NULL;
 
 	entry = (struct hwaddr_entry *)kmem_cache_zalloc(hwaddr_cache, GFP_KERNEL);
-
 	if (!entry)
 		return NULL;
 
 	atomic_set(&entry->refcnt, 1);
-	entry->remote = remote;
-	entry->local = local;
-	memcpy(entry->ha, ha, ha_len);
+	init_hwaddr_entry(entry, remote, local, ha, ha_len);
 
 	return entry;
 }
@@ -88,9 +96,9 @@ static struct hwaddr_entry * hwaddr_lookup(__be32 remote)
 {
 	struct hwaddr_entry * entry = NULL;
 
-	down_read(&hwaddr_hash_table_rwsem);
+	read_lock(&hwaddr_hash_table_lock);
 	entry = hwaddr_lookup_unsafe(remote);
-	up_read(&hwaddr_hash_table_rwsem);
+	read_unlock(&hwaddr_hash_table_lock);
 
 	return entry;
 }
@@ -102,12 +110,12 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 {
 	struct hwaddr_entry * entry = NULL;
 
-	down_write(&hwaddr_hash_table_rwsem);
+	write_lock(&hwaddr_hash_table_lock);
 	
 	entry = hwaddr_lookup_unsafe(remote);
 	if (entry)
 	{
-		up_write(&hwaddr_hash_table_rwsem);
+		write_unlock(&hwaddr_hash_table_lock);
 		return entry;
 	}
 
@@ -118,7 +126,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 		hwaddr_hold(entry);
 	}
 
-	up_write(&hwaddr_hash_table_rwsem);
+	write_unlock(&hwaddr_hash_table_lock);
 
 	pr_debug("create entry for remote ip = %pI4\n", &remote);
 
@@ -132,22 +140,14 @@ static struct hwaddr_entry * hwaddr_create(__be32 remote,
 {
 	struct hwaddr_entry * entry = hwaddr_lookup(remote);
 
-	/**
-	 * Check gateway changed
-	 **/
-	if (entry && (local != entry->local || !memcmp(entry->ha, ha, ha_len)))
-	{
-		down_write(&hwaddr_hash_table_rwsem);
-		hash_del(&entry->node);
-		up_write(&hwaddr_hash_table_rwsem);
-		hwaddr_put(entry);
-
-		hwaddr_put(entry);
-		entry = NULL;
-	}
-
 	if (!entry)
 		entry = hwaddr_create_slow(remote, local, ha, ha_len);
+
+	/**
+	 * Check gateway and update if changed
+	 **/
+	if (entry && (local != entry->local || !memcmp(entry->ha, ha, ha_len)))
+		init_hwaddr_entry(entry, remote, local, ha, ha_len);
 
 	return entry;
 }
@@ -158,13 +158,13 @@ static void hwaddr_cache_release(void)
 	struct hlist_node * tmp = NULL;
 	int index = 0;
 
-	down_write(&hwaddr_hash_table_rwsem);
+	write_lock(&hwaddr_hash_table_lock);
 	hash_for_each_safe(hwaddr_hash_table, index, tmp, entry, node)
 	{
 		hash_del(&entry->node);
 		hwaddr_put(entry);
 	}
-	up_write(&hwaddr_hash_table_rwsem);
+	write_unlock(&hwaddr_hash_table_lock);
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
@@ -211,6 +211,17 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 										struct net_device const *out,
 										int (*okfn)(struct sk_buff *))
 {
+	struct hwaddr_entry * entry = NULL;
+	struct iphdr const * const nhdr = ip_hdr(skb);
+
+	read_lock(&hwaddr_hash_table_lock);
+	entry = hwaddr_lookup_unsafe(nhdr->daddr);
+	hwaddr_put(entry); //just hack
+	read_unlock(&hwaddr_hash_table_lock);
+
+	if (entry)
+		pr_debug("packet for known host %pI4\n", &nhdr->daddr);
+
 	return NF_ACCEPT;
 }
 
@@ -260,6 +271,7 @@ static int __init hwaddr_cache_init(void)
 	{
 		printk(KERN_ERR "cannot register netfilter output hook\n");
 		nf_unregister_hook(&hwaddr_in_hook);
+		hwaddr_cache_release();
 		kmem_cache_destroy(hwaddr_cache);
 		return rc;
 	}
@@ -271,10 +283,11 @@ static int __init hwaddr_cache_init(void)
 
 static void __exit hwaddr_cache_cleanup(void)
 {
-	hwaddr_cache_release();
 
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
+
+	hwaddr_cache_release();
 	kmem_cache_destroy(hwaddr_cache);
 
 	pr_debug("hwaddr-cache module unloaded\n");
