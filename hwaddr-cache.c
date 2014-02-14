@@ -22,7 +22,7 @@ static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 static void hwaddr_free(struct hwaddr_entry *entry)
 {
-	printk(KERN_INFO "freeing entry for %pI4\n", &entry->remote);
+	pr_debug("freeing entry for %pI4\n", &entry->remote);
 			
 	kmem_cache_free(hwaddr_cache, entry);
 }
@@ -119,7 +119,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 
 	up_write(&hwaddr_hash_table_rwsem);
 
-	printk(KERN_INFO "create entry for remote ip = %pI4\n", &remote);
+	pr_debug("create entry for remote ip = %pI4\n", &remote);
 
 	return entry;
 }
@@ -264,7 +264,7 @@ static int __init hwaddr_cache_init(void)
 		return rc;
 	}
 
-	printk(KERN_INFO "hwaddr-cache module loaded\n");
+	pr_debug("hwaddr-cache module loaded\n");
 
 	return 0;
 }
@@ -277,7 +277,7 @@ static void __exit hwaddr_cache_cleanup(void)
 	nf_unregister_hook(&hwaddr_in_hook);
 	kmem_cache_destroy(hwaddr_cache);
 
-	printk(KERN_INFO "hwaddr-cache module unloaded\n");
+	pr_debug("hwaddr-cache module unloaded\n");
 }
 
 module_init(hwaddr_cache_init);
