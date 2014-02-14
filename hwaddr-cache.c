@@ -21,6 +21,7 @@ static rwlock_t hwaddr_hash_table_lock
 			= __RW_LOCK_UNLOCKED(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
+
 static void init_hwaddr_entry(struct hwaddr_entry *entry,
 								__be32 remote,
 								__be32 local,
@@ -29,6 +30,7 @@ static void init_hwaddr_entry(struct hwaddr_entry *entry,
 {
 	entry->remote = remote;
 	entry->local = local;
+	entry->ha_len = ha_len;
 	memcpy(entry->ha, ha, ha_len);
 }
 
@@ -146,8 +148,12 @@ static struct hwaddr_entry * hwaddr_create(__be32 remote,
 	/**
 	 * Check gateway and update if changed
 	 **/
-	if (entry && (local != entry->local || !memcmp(entry->ha, ha, ha_len)))
+	if (entry && (local != entry->local || entry->ha_len != ha_len
+			|| memcmp(entry->ha, ha, ha_len)))
+	{
+		pr_debug("update entry for %pI4\n", &entry->remote);
 		init_hwaddr_entry(entry, remote, local, ha, ha_len);
+	}
 
 	return entry;
 }
@@ -217,10 +223,10 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 
 	read_lock(&hwaddr_hash_table_lock);
 	entry = hwaddr_lookup_unsafe(nhdr->daddr);
-	hwaddr_put(entry); //just hack
+	hwaddr_put(entry); // just hack; part one
 	read_unlock(&hwaddr_hash_table_lock);
 
-	if (entry)
+	if (entry) // just hack; part two
 		pr_debug("packet for known host %pI4\n", &nhdr->daddr);
 
 	return NF_ACCEPT;

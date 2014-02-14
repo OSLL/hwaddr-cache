@@ -14,6 +14,7 @@ struct hwaddr_entry
 	atomic_t			refcnt;
 	__be32				remote;
 	__be32				local;
+	unsigned int		ha_len;
 
 	unsigned char		ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
 };
