@@ -131,6 +131,21 @@ static struct hwaddr_entry * hwaddr_create(__be32 remote,
 {
 	struct hwaddr_entry * entry = hwaddr_lookup(remote);
 
+	/**
+	 * Check gateway changed
+	 **/
+	if (entry && (remote != entry->remote || local != entry->local
+		|| !memcmp(entry->ha, ha, ha_len)))
+	{
+		down_write(&hwaddr_hash_table_rwsem);
+		hash_del(&entry->node);
+		up_write(&hwaddr_hash_table_rwsem);
+		hwaddr_put(entry);
+
+		hwaddr_put(entry);
+		entry = NULL;
+	}
+
 	if (!entry)
 		entry = hwaddr_create_slow(remote, local, ha, ha_len);
 
