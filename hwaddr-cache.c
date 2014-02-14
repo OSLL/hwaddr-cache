@@ -4,6 +4,7 @@
 #include <linux/rwsem.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/version.h>
 
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
@@ -167,11 +168,11 @@ static void hwaddr_cache_release(void)
 	up_write(&hwaddr_hash_table_rwsem);
 }
 
-/**
- * Interface changed in kernel version 3.13 to:
- * static unsigned int hwaddr_hook_fn(struct nf_hook_ops const *ops,
- **/
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
 static unsigned int hwaddr_in_hook_fn(unsigned int hooknum,
+#else
+static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
+#endif
 										struct sk_buff *skb,
 										struct net_device const *in,
 										struct net_device const *out,
@@ -201,11 +202,11 @@ static unsigned int hwaddr_in_hook_fn(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
-/**
- * Interface changed in kernel version 3.13 to:
- * static unsigned int hwaddr_hook_fn(struct nf_hook_ops const *ops,
- **/
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
 static unsigned int hwaddr_out_hook_fn(unsigned int hooknum,
+#else
+static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
+#endif
 										struct sk_buff *skb,
 										struct net_device const *in,
 										struct net_device const *out,
