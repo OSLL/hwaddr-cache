@@ -152,22 +152,6 @@ static struct hwaddr_entry * hwaddr_create(__be32 remote,
 	return entry;
 }
 
-/**
- * We doesn't need it so far
- *
- * static void hwaddr_delete(struct hwaddr_entry *entry)
- * {
- * 	if (!entry)
- * 		return;
- * 
- * 	down_write(&hwaddr_hash_table_rwsem);
- * 	hash_del(&entry->node);
- * 	up_write(&hwaddr_hash_table_rwsem);
- * 
- * 	hwaddr_put(entry);
- * }
- **/
-
 static void hwaddr_cache_release(void)
 {
 	struct hwaddr_entry * entry = NULL;
