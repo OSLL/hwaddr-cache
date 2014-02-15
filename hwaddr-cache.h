@@ -6,16 +6,22 @@
 #define LICENSE			"Dual MIT/GPL"
 
 #include <linux/kernel.h>
+#include <linux/rwlock.h>
 #include <uapi/linux/netdevice.h>
 
 struct hwaddr_entry
 {
 	struct hlist_node	node;
+
+	/* prevents entry destroy */
 	atomic_t			refcnt;
+
 	__be32				remote;
 	__be32				local;
-	unsigned int		ha_len;
 
+	/* prevents data races on ha */
+	rwlock_t			lock;	
+	unsigned int		ha_len;
 	unsigned char		ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
 };
 

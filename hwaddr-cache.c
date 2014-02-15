@@ -1,7 +1,6 @@
 #include <linux/hashtable.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/rwlock.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/version.h>
@@ -56,6 +55,8 @@ static struct hwaddr_entry * hwaddr_alloc(__be32 remote,
 		return NULL;
 
 	atomic_set(&entry->refcnt, 1);
+	rwlock_init(&entry->lock);
+
 	init_hwaddr_entry(entry, remote, local, ha, ha_len);
 
 	return entry;
@@ -135,27 +136,28 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 	return entry;
 }
 
-static struct hwaddr_entry * hwaddr_create(__be32 remote,
-											__be32 local,
-											unsigned char const *ha,
-											unsigned ha_len)
+static void hwaddr_update(__be32 remote,
+							__be32 local,
+							unsigned char const *ha,
+							unsigned ha_len)
 {
 	struct hwaddr_entry * entry = hwaddr_lookup(remote);
-
 	if (!entry)
 		entry = hwaddr_create_slow(remote, local, ha, ha_len);
 
-	/**
-	 * Check gateway and update if changed
-	 **/
+	if (!entry)
+		return;
+
+	write_lock(&entry->lock);
 	if (entry && (local != entry->local || entry->ha_len != ha_len
 			|| memcmp(entry->ha, ha, ha_len)))
 	{
 		pr_debug("update entry for %pI4\n", &entry->remote);
 		init_hwaddr_entry(entry, remote, local, ha, ha_len);
 	}
+	write_unlock(&entry->lock);
 
-	return entry;
+	hwaddr_put(entry);
 }
 
 static void hwaddr_cache_release(void)
@@ -171,6 +173,7 @@ static void hwaddr_cache_release(void)
 		hwaddr_put(entry);
 	}
 	write_unlock(&hwaddr_hash_table_lock);
+
 	kmem_cache_destroy(hwaddr_cache);
 }
 
@@ -202,8 +205,7 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 
 	if (target == in)
-		hwaddr_put(hwaddr_create(nhdr->saddr, nhdr->daddr,
-									lhdr->h_source, ETH_ALEN));
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source, ETH_ALEN);
 
 	return NF_ACCEPT;
 }
@@ -223,11 +225,14 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 
 	read_lock(&hwaddr_hash_table_lock);
 	entry = hwaddr_lookup_unsafe(nhdr->daddr);
-	hwaddr_put(entry); // just hack; part one
 	read_unlock(&hwaddr_hash_table_lock);
 
-	if (entry) // just hack; part two
-		pr_debug("packet for known host %pI4\n", &nhdr->daddr);
+	if (!entry)
+		return NF_ACCEPT;
+
+	read_lock(&entry->lock);
+	pr_debug("packet for known host %pI4\n", &nhdr->daddr);
+	read_unlock(&entry->lock);
 
 	return NF_ACCEPT;
 }
