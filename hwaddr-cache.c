@@ -13,6 +13,8 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 
+#include <net/route.h>
+
 #include "hwaddr-cache.h"
 
 static struct kmem_cache *hwaddr_cache;
@@ -212,6 +214,47 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
+static struct rtable * find_new_route(struct net * nm,
+										__be32 daddr,
+										__be32 saddr,
+										__u8 proto,
+										__u8 tos,
+										int oif)
+{
+	struct flowi4 fl4 = {
+		.daddr = daddr,
+		.saddr = saddr,
+		.flowi4_proto = proto,
+		.flowi4_tos = tos,
+		.flowi4_oif = oif,
+	};
+
+	return ip_route_output_key(nm, &fl4);
+}
+
+static void update_route(struct sk_buff *skb, struct net_device const * out)
+{
+	struct iphdr const * const nhdr = ip_hdr(skb);
+	struct rtable * const rt = find_new_route(dev_net(out),
+												nhdr->daddr,
+												nhdr->saddr,
+												nhdr->protocol,
+												nhdr->tos,
+												out->ifindex);
+
+	if (rt)
+	{
+		/* update old entry */
+		struct dst_entry * old = skb_dst(skb);
+		skb_dst_set(skb, &rt->dst);
+		dst_release(old);
+
+		/* cache dst in socket, if available */
+		if (skb->sk)
+			sk_dst_set(skb->sk, dst_clone(&rt->dst));
+	}
+}
+
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
 static unsigned int hwaddr_out_hook_fn(unsigned int hooknum,
 #else
@@ -233,14 +276,16 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	if (!entry)
 		return NF_ACCEPT;
 
-	target = __ip_dev_find(dev_net(out), nhdr->saddr, false);
-	if (target != out)
-		pr_debug("packet for known host %pI4 through wrong device\n", &nhdr->daddr);
+	target = ip_dev_find(dev_net(out), entry->local);
+	if (target && target != out)
+	{
+		pr_debug("packet for known host %pI4 through wrong device... reroute\n", &nhdr->daddr);
+		update_route(skb, target);
+	}
+	if (target)
+		dev_put(target);
 
-	/**
-	 * read_lock(&entry->lock);
-	 * read_unlock(&entry->lock);
-	 **/
+	hwaddr_put(entry);
 
 	return NF_ACCEPT;
 }
