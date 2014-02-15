@@ -245,9 +245,8 @@ static void update_route(struct sk_buff *skb, struct net_device const * out)
 	if (rt)
 	{
 		/* update old entry */
-		struct dst_entry * old = skb_dst(skb);
+		skb_dst_drop(skb);
 		skb_dst_set(skb, &rt->dst);
-		dst_release(old);
 
 		/* cache dst in socket, if available */
 		if (skb->sk)
