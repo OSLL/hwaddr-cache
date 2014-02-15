@@ -203,7 +203,9 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	lhdr = eth_hdr(skb);
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
-
+	/**
+	 * Ignore packets, that should be filtered by rp_filter
+	 **/
 	if (target == in)
 		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source, ETH_ALEN);
 
@@ -220,19 +222,25 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 										struct net_device const *out,
 										int (*okfn)(struct sk_buff *))
 {
+	struct net_device * target = NULL;
 	struct hwaddr_entry * entry = NULL;
 	struct iphdr const * const nhdr = ip_hdr(skb);
 
-	read_lock(&hwaddr_hash_table_lock);
-	entry = hwaddr_lookup_unsafe(nhdr->daddr);
-	read_unlock(&hwaddr_hash_table_lock);
+	if (!out)
+		return NF_ACCEPT;
 
+	entry = hwaddr_lookup(nhdr->daddr);
 	if (!entry)
 		return NF_ACCEPT;
 
-	read_lock(&entry->lock);
-	pr_debug("packet for known host %pI4\n", &nhdr->daddr);
-	read_unlock(&entry->lock);
+	target = __ip_dev_find(dev_net(out), nhdr->saddr, false);
+	if (target != out)
+		pr_debug("packet for known host %pI4 through wrong device\n", &nhdr->daddr);
+
+	/**
+	 * read_lock(&entry->lock);
+	 * read_unlock(&entry->lock);
+	 **/
 
 	return NF_ACCEPT;
 }
