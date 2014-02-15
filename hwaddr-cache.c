@@ -250,7 +250,7 @@ static void update_route(struct sk_buff *skb, struct net_device const * out)
 
 		/* cache dst in socket, if available */
 		if (skb->sk)
-			sk_dst_set(skb->sk, dst_clone(&rt->dst));
+			sk_setup_caps(skb->sk, &rt->dst);
 	}
 }
 
