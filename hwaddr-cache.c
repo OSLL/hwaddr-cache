@@ -18,8 +18,7 @@
 #include "hwaddr-cache.h"
 
 static struct kmem_cache *hwaddr_cache;
-static rwlock_t hwaddr_hash_table_lock
-			= __RW_LOCK_UNLOCKED(hwaddr_hash_table_lock);
+static DEFINE_RWLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 
