@@ -214,31 +214,12 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-static struct rtable * find_new_route(struct net * nm,
-										__be32 daddr,
-										__be32 saddr,
-										__u8 proto,
-										__u8 tos,
-										int oif)
-{
-	struct flowi4 fl4 = {
-		.daddr = daddr,
-		.saddr = saddr,
-		.flowi4_proto = proto,
-		.flowi4_tos = tos,
-		.flowi4_oif = oif,
-	};
-
-	return ip_route_output_key(nm, &fl4);
-}
-
 static void update_route(struct sk_buff *skb, struct net_device const * out)
 {
 	struct iphdr const * const nhdr = ip_hdr(skb);
-	struct rtable * const rt = find_new_route(dev_net(out),
+	struct rtable * const rt = ip_route_output(dev_net(out),
 												nhdr->daddr,
 												nhdr->saddr,
-												nhdr->protocol,
 												nhdr->tos,
 												out->ifindex);
 
