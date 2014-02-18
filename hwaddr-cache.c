@@ -227,6 +227,7 @@ static struct rtable * update_route(struct sk_buff *skb, struct net_device const
 	if (rt)
 	{
 		/* update old entry */
+		dst_hold(&rt->dst);
 		skb_dst_drop(skb);
 		skb_dst_set(skb, &rt->dst);
 
@@ -301,7 +302,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	{
 		neigh = __neigh_create(&arp_tbl, &next, target, false);
 		if (neigh)
-			neigh_update(neigh, entry->ha, NUD_STALE,
+			neigh_update(neigh, entry->ha, NUD_NOARP,
 						NEIGH_UPDATE_F_OVERRIDE);
 	}
 	rcu_read_unlock_bh();
