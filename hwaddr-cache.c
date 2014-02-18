@@ -13,6 +13,8 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 
+#include <net/arp.h>
+#include <net/neighbour.h>
 #include <net/route.h>
 
 #include "hwaddr-cache.h"
@@ -213,7 +215,7 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-static void update_route(struct sk_buff *skb, struct net_device const * out)
+static struct rtable * update_route(struct sk_buff *skb, struct net_device const * out)
 {
 	struct iphdr const * const nhdr = ip_hdr(skb);
 	struct rtable * const rt = ip_route_output(dev_net(out),
@@ -232,6 +234,8 @@ static void update_route(struct sk_buff *skb, struct net_device const * out)
 		if (skb->sk)
 			sk_setup_caps(skb->sk, &rt->dst);
 	}
+
+	return rt;
 }
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
@@ -246,6 +250,9 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 {
 	struct net_device * target = NULL;
 	struct hwaddr_entry * entry = NULL;
+	struct neighbour * neigh = NULL;
+	struct rtable * rt = NULL;
+	u32 next = 0;
 	struct iphdr const * const nhdr = ip_hdr(skb);
 
 	if (!out)
@@ -256,14 +263,50 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	target = ip_dev_find(dev_net(out), entry->local);
-	if (target && target != out)
+	if (!target)
 	{
-		pr_debug("packet for known host %pI4 through wrong device... reroute\n", &nhdr->daddr);
-		update_route(skb, target);
+		hwaddr_put(entry);
+		return NF_ACCEPT;
 	}
-	if (target)
-		dev_put(target);
 
+	if (target == out)
+	{
+		dev_put(target);
+		hwaddr_put(entry);
+		return NF_ACCEPT;
+	}
+
+	pr_debug("packet for known host %pI4 through wrong device... reroute\n", &nhdr->daddr);
+	rt = update_route(skb, target);
+
+	/**
+	 * Something strange happened
+	 **/
+	if (!rt)
+	{
+		dev_put(target);
+		hwaddr_put(entry);
+		return NF_ACCEPT;
+	}
+
+	/**
+	 * update or create neighbour, i really don't understand
+	 * rcu synchronization, so deep studying needed, to
+	 * confirm correctness of this.
+	 **/
+	rcu_read_lock_bh();
+	next = (__force u32) rt_nexthop(rt, nhdr->daddr);
+	neigh = __ipv4_neigh_lookup_noref(target, next);
+	if (!neigh)
+	{
+		neigh = __neigh_create(&arp_tbl, &next, target, false);
+		if (neigh)
+			neigh_update(neigh, entry->ha, NUD_STALE,
+						NEIGH_UPDATE_F_OVERRIDE);
+	}
+	rcu_read_unlock_bh();
+
+	dev_put(target);
 	hwaddr_put(entry);
 
 	return NF_ACCEPT;
