@@ -1,10 +1,8 @@
-#include <linux/hashtable.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/string.h>
 #include <linux/version.h>
 
+#include <linux/hashtable.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/inetdevice.h>
@@ -12,6 +10,9 @@
 #include <linux/netdevice.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/slab.h>
+#include <linux/spinlock.h>
+#include <linux/string.h>
 
 #include <net/arp.h>
 #include <net/neighbour.h>
@@ -20,7 +21,7 @@
 #include "hwaddr-cache.h"
 
 static struct kmem_cache *hwaddr_cache;
-static DEFINE_RWLOCK(hwaddr_hash_table_lock);
+static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 
@@ -86,7 +87,7 @@ static struct hwaddr_entry * hwaddr_lookup_unsafe(__be32 remote)
 {
 	struct hwaddr_entry * entry = NULL;
 
-	hash_for_each_possible(hwaddr_hash_table, entry, node, remote)
+	hash_for_each_possible_rcu(hwaddr_hash_table, entry, node, remote)
 	{
 		if (entry->remote == remote)
 		{
@@ -102,9 +103,9 @@ static struct hwaddr_entry * hwaddr_lookup(__be32 remote)
 {
 	struct hwaddr_entry * entry = NULL;
 
-	read_lock(&hwaddr_hash_table_lock);
+	rcu_read_lock();
 	entry = hwaddr_lookup_unsafe(remote);
-	read_unlock(&hwaddr_hash_table_lock);
+	rcu_read_unlock();
 
 	return entry;
 }
@@ -116,23 +117,23 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 {
 	struct hwaddr_entry * entry = NULL;
 
-	write_lock(&hwaddr_hash_table_lock);
+	spin_lock(&hwaddr_hash_table_lock);
 	
-	entry = hwaddr_lookup_unsafe(remote);
+	entry = hwaddr_lookup(remote);
 	if (entry)
 	{
-		write_unlock(&hwaddr_hash_table_lock);
+		spin_unlock(&hwaddr_hash_table_lock);
 		return entry;
 	}
 
 	entry = hwaddr_alloc(remote, local, ha, ha_len);
 	if (entry)
 	{
-		hash_add(hwaddr_hash_table, &entry->node, remote);
+		hash_add_rcu(hwaddr_hash_table, &entry->node, remote);
 		hwaddr_hold(entry);
 	}
 
-	write_unlock(&hwaddr_hash_table_lock);
+	spin_unlock(&hwaddr_hash_table_lock);
 
 	pr_debug("create entry for remote ip = %pI4\n", &remote);
 
@@ -169,13 +170,16 @@ static void hwaddr_cache_release(void)
 	struct hlist_node * tmp = NULL;
 	int index = 0;
 
-	write_lock(&hwaddr_hash_table_lock);
+	spin_lock(&hwaddr_hash_table_lock);
+
+	synchronize_rcu();
 	hash_for_each_safe(hwaddr_hash_table, index, tmp, entry, node)
 	{
-		hash_del(&entry->node);
+		hash_del_rcu(&entry->node);
 		hwaddr_put(entry);
 	}
-	write_unlock(&hwaddr_hash_table_lock);
+
+	spin_unlock(&hwaddr_hash_table_lock);
 
 	kmem_cache_destroy(hwaddr_cache);
 }
@@ -280,9 +284,6 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	pr_debug("packet for known host %pI4 through wrong device... reroute\n", &nhdr->daddr);
 	rt = update_route(skb, target);
 
-	/**
-	 * Something strange happened
-	 **/
 	if (!rt)
 	{
 		dev_put(target);
@@ -290,21 +291,22 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 	}
 
-	/**
-	 * update or create neighbour, i really don't understand
-	 * rcu synchronization, so deep studying needed, to
-	 * confirm correctness of this.
-	 **/
 	rcu_read_lock_bh();
+
 	next = (__force u32) rt_nexthop(rt, nhdr->daddr);
 	neigh = __ipv4_neigh_lookup_noref(target, next);
 	if (!neigh)
 	{
 		neigh = __neigh_create(&arp_tbl, &next, target, false);
 		if (neigh)
+		{
+			read_lock(&entry->lock);
 			neigh_update(neigh, entry->ha, NUD_NOARP,
 						NEIGH_UPDATE_F_OVERRIDE);
+			read_unlock(&entry->lock);
+		}
 	}
+
 	rcu_read_unlock_bh();
 
 	dev_put(target);
