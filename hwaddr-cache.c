@@ -184,7 +184,7 @@ static void hwaddr_cache_release(void)
 	kmem_cache_destroy(hwaddr_cache);
 }
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 static unsigned int hwaddr_in_hook_fn(unsigned int hooknum,
 #else
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
@@ -243,7 +243,7 @@ static struct rtable * update_route(struct sk_buff *skb, struct net_device const
 	return rt;
 }
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 static unsigned int hwaddr_out_hook_fn(unsigned int hooknum,
 #else
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
