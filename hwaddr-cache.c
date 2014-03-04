@@ -54,7 +54,7 @@ static struct hwaddr_entry * hwaddr_alloc(__be32 remote,
 	if (ha_len > MAX_ADDR_LEN)
 		return NULL;
 
-	entry = (struct hwaddr_entry *)kmem_cache_zalloc(hwaddr_cache, GFP_KERNEL);
+	entry = (struct hwaddr_entry *)kmem_cache_zalloc(hwaddr_cache, GFP_ATOMIC);
 	if (!entry)
 		return NULL;
 
