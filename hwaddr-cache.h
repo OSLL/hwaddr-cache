@@ -17,7 +17,6 @@ struct hwaddr_entry
 	atomic_t			refcnt;
 
 	__be32				remote;
-	__be32				local;
 
 	/* prevents data races on ha */
 	rwlock_t			lock;	
