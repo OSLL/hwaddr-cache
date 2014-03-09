@@ -268,13 +268,6 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 	}
 
-	if (target == out)
-	{
-		dev_put(target);
-		hwaddr_put(entry);
-		return NF_ACCEPT;
-	}
-
 	pr_debug("packet for known host %pI4 through wrong device... reroute\n", &nhdr->daddr);
 	rt = update_route(skb, target);
 
