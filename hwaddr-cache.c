@@ -164,16 +164,12 @@ static void hwaddr_cache_release(void)
 	struct hlist_node * tmp = NULL;
 	int index = 0;
 
-	spin_lock(&hwaddr_hash_table_lock);
-
 	synchronize_rcu();
 	hash_for_each_safe(hwaddr_hash_table, index, tmp, entry, node)
 	{
 		hash_del_rcu(&entry->node);
 		hwaddr_put(entry);
 	}
-
-	spin_unlock(&hwaddr_hash_table_lock);
 
 	kmem_cache_destroy(hwaddr_cache);
 }
