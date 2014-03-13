@@ -5,9 +5,7 @@
 #include <linux/hashtable.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
-#include <linux/inetdevice.h>
 #include <linux/ip.h>
-#include <linux/netdevice.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/slab.h>

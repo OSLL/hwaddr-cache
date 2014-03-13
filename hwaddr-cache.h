@@ -7,7 +7,7 @@
 
 #include <linux/kernel.h>
 #include <linux/rwlock.h>
-#include <uapi/linux/netdevice.h>
+#include <linux/inetdevice.h>
 
 struct hwaddr_entry
 {
