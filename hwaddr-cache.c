@@ -81,8 +81,8 @@ static void hwaddr_put(struct hwaddr_entry *entry)
 static struct hwaddr_entry * hwaddr_lookup_unsafe(__be32 remote)
 {
 	struct hwaddr_entry * entry = NULL;
-
-	hash_for_each_possible_rcu(hwaddr_hash_table, entry, node, remote)
+	struct hlist_node * list = NULL;
+	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, remote)
 	{
 		if (entry->remote == remote)
 		{
@@ -160,10 +160,11 @@ static void hwaddr_cache_release(void)
 {
 	struct hwaddr_entry * entry = NULL;
 	struct hlist_node * tmp = NULL;
+	struct hlist_node * list = NULL;
 	int index = 0;
 
 	synchronize_rcu();
-	hash_for_each_safe(hwaddr_hash_table, index, tmp, entry, node)
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, node)
 	{
 		hash_del_rcu(&entry->node);
 		hwaddr_put(entry);
