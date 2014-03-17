@@ -26,7 +26,7 @@ static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 static void init_hwaddr_entry(struct hwaddr_entry *entry,
 				__be32 remote,
 				u8 const *ha,
-				unsigned int ha_len)
+				unsigned ha_len)
 {
 	entry->remote = remote;
 	entry->ha_len = ha_len;
@@ -40,9 +40,9 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-static struct hwaddr_entry * hwaddr_alloc(__be32 remote,
+static struct hwaddr_entry *hwaddr_alloc(__be32 remote,
 						u8 const *ha,
-						unsigned int ha_len)
+						unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -78,10 +78,10 @@ static void hwaddr_put(struct hwaddr_entry *entry)
 		hwaddr_free(entry);
 }
 
-static struct hwaddr_entry * hwaddr_lookup_unsafe(__be32 remote)
+static struct hwaddr_entry *hwaddr_lookup_unsafe(__be32 remote)
 {
-	struct hwaddr_entry * entry = NULL;
-	struct hlist_node * list = NULL;
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *list = NULL;
 	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, remote)
 	{
 		if (entry->remote == remote)
@@ -94,9 +94,9 @@ static struct hwaddr_entry * hwaddr_lookup_unsafe(__be32 remote)
 	return NULL;
 }
 
-static struct hwaddr_entry * hwaddr_lookup(__be32 remote)
+static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 {
-	struct hwaddr_entry * entry = NULL;
+	struct hwaddr_entry *entry = NULL;
 
 	rcu_read_lock();
 	entry = hwaddr_lookup_unsafe(remote);
@@ -107,9 +107,9 @@ static struct hwaddr_entry * hwaddr_lookup(__be32 remote)
 
 static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 						u8 const *ha,
-						unsigned int ha_len)
+						unsigned ha_len)
 {
-	struct hwaddr_entry * entry = NULL;
+	struct hwaddr_entry *entry = NULL;
 
 	spin_lock(&hwaddr_hash_table_lock);
 	
@@ -136,9 +136,9 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 
 static void hwaddr_update(__be32 remote,
 				u8 const *ha,
-				unsigned int ha_len)
+				unsigned ha_len)
 {
-	struct hwaddr_entry * entry = hwaddr_lookup(remote);
+	struct hwaddr_entry *entry = hwaddr_lookup(remote);
 	if (!entry)
 		entry = hwaddr_create_slow(remote, ha, ha_len);
 
@@ -158,9 +158,9 @@ static void hwaddr_update(__be32 remote,
 
 static void hwaddr_cache_release(void)
 {
-	struct hwaddr_entry * entry = NULL;
-	struct hlist_node * tmp = NULL;
-	struct hlist_node * list = NULL;
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
+	struct hlist_node *list = NULL;
 	int index = 0;
 
 	synchronize_rcu();
@@ -174,7 +174,7 @@ static void hwaddr_cache_release(void)
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
-static unsigned int hwaddr_in_hook_fn(unsigned int hooknum,
+static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
@@ -183,9 +183,9 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 					struct net_device const *out,
 					int (*okfn)(struct sk_buff *))
 {
-	struct net_device * target = NULL;
-	struct ethhdr * lhdr = NULL;
-	struct iphdr * nhdr = NULL;
+	struct net_device *target = NULL;
+	struct ethhdr *lhdr = NULL;
+	struct iphdr *nhdr = NULL;
 
 	if (!in)
 		return NF_ACCEPT;
@@ -208,9 +208,9 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
-	struct neighbour * neigh = rt->dst._neighbour;
+	struct neighbour *neigh = rt->dst._neighbour;
 #else
-	struct neighbour * neigh = NULL;
+	struct neighbour *neigh = NULL;
 	__be32 next = 0;
 
 	rcu_read_lock_bh();
@@ -233,8 +233,8 @@ static struct rtable *update_route(struct sk_buff *skb,
 					struct net_device const *out,
 					struct hwaddr_entry *entry)
 {
-	struct iphdr const * const nhdr = ip_hdr(skb);
-	struct rtable * const rt = ip_route_output(dev_net(out),
+	struct iphdr const *const nhdr = ip_hdr(skb);
+	struct rtable *const rt = ip_route_output(dev_net(out),
 							nhdr->daddr,
 							nhdr->saddr,
 							nhdr->tos,
@@ -254,7 +254,7 @@ static struct rtable *update_route(struct sk_buff *skb,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
-static unsigned int hwaddr_out_hook_fn(unsigned int hooknum,
+static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
@@ -263,10 +263,10 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 					struct net_device const *out,
 					int (*okfn)(struct sk_buff *))
 {
-	struct net_device * target = NULL;
-	struct hwaddr_entry * entry = NULL;
-	struct rtable * rt = NULL;
-	struct iphdr const * const nhdr = ip_hdr(skb);
+	struct net_device *target = NULL;
+	struct hwaddr_entry *entry = NULL;
+	struct rtable *rt = NULL;
+	struct iphdr const *const nhdr = ip_hdr(skb);
 
 	if (!out)
 		return NF_ACCEPT;

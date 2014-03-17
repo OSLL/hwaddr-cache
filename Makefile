@@ -1,4 +1,3 @@
-ccflags-y += -Wall
 obj-m += hwaddr-cache.o
 
 CFLAGS_hwaddr-cache.o := -DDEBUG
