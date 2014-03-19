@@ -1,0 +1,38 @@
+From 248d5f67dd2d7d3dec8ccb394c16389b00fc26bf Mon Sep 17 00:00:00 2001
+From: Vlad Grozin <glukobug@ya.ru>
+Date: Fri, 14 Mar 2014 06:06:25 +0400
+Subject: [PATCH] HWADDR-CACHE added to Kconfig
+
+---
+ net/Kconfig  | 6 ++++++
+ net/Makefile | 1 +
+ 2 files changed, 7 insertions(+)
+
+diff --git a/net/Kconfig b/net/Kconfig
+index 878151c..84689cf 100644
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -323,5 +323,11 @@ source "net/9p/Kconfig"
+ source "net/caif/Kconfig"
+ source "net/ceph/Kconfig"
+ 
++config HWADDRCACHE
++	bool "Hwaddr-cache"
++	default y
++	depends on NETDEVICES
++	---help---
++	Caches previous hop
+ 
+ endif   # if NET
+diff --git a/net/Makefile b/net/Makefile
+index a51d946..87d8740 100644
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -68,3 +68,4 @@ obj-$(CONFIG_WIMAX)		+= wimax/
+ obj-$(CONFIG_DNS_RESOLVER)	+= dns_resolver/
+ obj-$(CONFIG_CEPH_LIB)		+= ceph/
+ obj-$(CONFIG_BATMAN_ADV)	+= batman-adv/
++obj-$(CONFIG_HWADDRCACHE)	+= hwaddr-cache/
+-- 
+1.8.4.5
+
