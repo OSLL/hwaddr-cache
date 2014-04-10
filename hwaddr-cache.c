@@ -317,10 +317,7 @@ static int __init hwaddr_cache_init(void)
 	int rc = 0;
 	hwaddr_cache = kmem_cache_create("hwaddr-cache",
 						sizeof(struct hwaddr_entry),
-						0,
-						SLAB_RED_ZONE | SLAB_POISON
-							| SLAB_HWCACHE_ALIGN,
-						NULL);
+						0, SLAB_HWCACHE_ALIGN, NULL);
 
 	if (!hwaddr_cache)
 	{
