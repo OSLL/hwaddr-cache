@@ -284,11 +284,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 
 	rt = update_route(skb, target, entry);
 	if (!rt)
-	{
-		dev_put(target);
-		hwaddr_put(entry);
-		return NF_ACCEPT;
-	}
+		pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
 
 	dev_put(target);
 	hwaddr_put(entry);
