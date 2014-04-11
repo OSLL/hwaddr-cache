@@ -146,7 +146,7 @@ static void hwaddr_update(__be32 remote,
 		return;
 
 	write_lock(&entry->lock);
-	if (entry && (entry->ha_len != ha_len || memcmp(entry->ha, ha, ha_len)))
+	if (entry->ha_len != ha_len || memcmp(entry->ha, ha, ha_len))
 	{
 		pr_debug("update entry for %pI4\n", &entry->remote);
 		init_hwaddr_entry(entry, remote, ha, ha_len);
