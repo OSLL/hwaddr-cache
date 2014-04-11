@@ -216,12 +216,12 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 	rcu_read_lock_bh();
 	next = rt_nexthop(rt, entry->remote);
 	neigh = __ipv4_neigh_lookup_noref(rt->dst.dev, next);
-	if (!neigh)
+	if (IS_ERR_OR_NULL(neigh))
 		neigh = __neigh_create(&arp_tbl, &next, rt->dst.dev, false);
 	rcu_read_unlock_bh();
 #endif
 
-	if (!neigh)
+	if (IS_ERR(neigh))
 		return;
 
 	read_lock(&entry->lock);
@@ -240,7 +240,7 @@ static struct rtable *update_route(struct sk_buff *skb,
 							nhdr->tos,
 							out->ifindex);
 
-	if (rt)
+	if (!IS_ERR(rt))
 	{
 		dst_hold(&rt->dst);
 		skb_dst_drop(skb);
@@ -283,7 +283,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	}
 
 	rt = update_route(skb, target, entry);
-	if (!rt)
+	if (IS_ERR(rt))
 		pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
 
 	dev_put(target);
