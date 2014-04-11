@@ -317,14 +317,14 @@ static int __init hwaddr_cache_init(void)
 
 	if (!hwaddr_cache)
 	{
-		printk(KERN_ERR "cannot create slab cache for hwaddr module\n");
+		pr_err("cannot create slab cache for hwaddr module\n");
 		return -ENOMEM;
 	}
 
 	rc = nf_register_hook(&hwaddr_in_hook);
 	if (rc)
 	{
-		printk(KERN_ERR "cannot register netfilter input hook\n");
+		pr_err("cannot register netfilter input hook\n");
 		hwaddr_cache_release();
 		return rc;
 	}
@@ -332,7 +332,7 @@ static int __init hwaddr_cache_init(void)
 	rc = nf_register_hook(&hwaddr_out_hook);
 	if (rc)
 	{
-		printk(KERN_ERR "cannot register netfilter output hook\n");
+		pr_err("cannot register netfilter output hook\n");
 		nf_unregister_hook(&hwaddr_in_hook);
 		hwaddr_cache_release();
 		return rc;
