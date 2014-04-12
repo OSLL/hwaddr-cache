@@ -116,7 +116,6 @@ static struct hwaddr_entry *hwaddr_lookup_local_unsafe(__be32 local)
 	{
 		if (entry->local == local)
 		{
-			hwaddr_hold(entry);
 			return entry;
 		}
 	}
@@ -209,18 +208,18 @@ void clear_cache(__be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
 
-	// __be32  local
-	// #define INADDR_ANY  ((unsigned long int) 0x00000000)
 	if (local == htonl(INADDR_ANY))
 	{
 		hwaddr_cache_release();
 	}
 	else
 	{
-		entry = hwaddr_lookup_local(local);
-		synchronize_rcu();
-		hash_del_rcu(&entry->node);
-		hwaddr_put(entry);
+		while ((entry = hwaddr_lookup_local(local)) != NULL)
+		{
+			synchronize_rcu();
+			hash_del_rcu(&entry->node);
+			hwaddr_put(entry);
+		}
 	}
 }
 
