@@ -295,9 +295,61 @@ static struct nf_hook_ops hwaddr_out_hook = {
 	.priority = NF_IP_PRI_LAST
 };
 
+static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
+{
+	struct in_ifaddr const* const ifa = (struct in_ifaddr *)ptr;
+	switch (event)
+	{
+	case NETDEV_UP:
+		pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
+		break;
+	case NETDEV_DOWN:
+		pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block aufs_inetaddr_notifier = {
+	.notifier_call = aufs_inetaddr_event,
+};
+
+static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
+{
+	struct net_device const* const dev = netdev_notifier_info_to_dev(ptr);
+	struct in_device const* const in_dev = __in_dev_get_rtnl(dev);
+
+	if (!in_dev)
+		return NOTIFY_DONE;
+
+	switch (event)
+	{
+	case NETDEV_UP:
+		for_ifa(in_dev) {
+			pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
+		} endfor_ifa(in_dev);
+		break;
+	case NETDEV_DOWN:
+		for_ifa(in_dev) {
+			pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
+		} endfor_ifa(in_dev);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block aufs_netdev_notifier = {
+	.notifier_call = aufs_netdev_event,
+};
+
 static int __init hwaddr_cache_init(void)
 {
 	int rc = 0;
+
+	register_netdevice_notifier(&aufs_netdev_notifier);
+	register_inetaddr_notifier(&aufs_inetaddr_notifier);
 
 	hwaddr_cache = kmem_cache_create("hwaddr-cache",
 						sizeof(struct hwaddr_entry),
@@ -336,6 +388,9 @@ static void __exit hwaddr_cache_cleanup(void)
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
 	hwaddr_cache_release();
+
+	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
+	unregister_netdevice_notifier(&aufs_netdev_notifier);
 
 	pr_debug("hwaddr-cache module unloaded\n");
 }
