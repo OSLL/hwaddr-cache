@@ -23,10 +23,8 @@ static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 
-static void init_hwaddr_entry(struct hwaddr_entry *entry,
-				__be32 remote,
-				u8 const *ha,
-				unsigned ha_len)
+static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
+			u8 const *ha, unsigned ha_len)
 {
 	entry->remote = remote;
 	entry->ha_len = ha_len;
@@ -40,9 +38,8 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-static struct hwaddr_entry *hwaddr_alloc(__be32 remote,
-						u8 const *ha,
-						unsigned ha_len)
+static struct hwaddr_entry *hwaddr_alloc(__be32 remote, u8 const *ha,
+			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -105,9 +102,8 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 	return entry;
 }
 
-static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
-						u8 const *ha,
-						unsigned ha_len)
+static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, u8 const *ha,
+			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -134,9 +130,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 	return entry;
 }
 
-static void hwaddr_update(__be32 remote,
-				u8 const *ha,
-				unsigned ha_len)
+static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = hwaddr_lookup(remote);
 	if (!entry)
@@ -178,10 +172,8 @@ static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
-					struct sk_buff *skb,
-					struct net_device const *in,
-					struct net_device const *out,
-					int (*okfn)(struct sk_buff *))
+			struct sk_buff *skb, struct net_device const *in,
+			struct net_device const *out, int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct ethhdr *lhdr = NULL;
@@ -234,11 +226,8 @@ static struct rtable *update_route(struct sk_buff *skb,
 					struct hwaddr_entry *entry)
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
-	struct rtable *const rt = ip_route_output(dev_net(out),
-							nhdr->daddr,
-							nhdr->saddr,
-							nhdr->tos,
-							out->ifindex);
+	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
+				nhdr->saddr, nhdr->tos, out->ifindex);
 
 	if (!IS_ERR(rt))
 	{
@@ -258,10 +247,8 @@ static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
-					struct sk_buff *skb,
-					struct net_device const *in,
-					struct net_device const *out,
-					int (*okfn)(struct sk_buff *))
+			struct sk_buff *skb, struct net_device const *in,
+			struct net_device const *out, int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct hwaddr_entry *entry = NULL;
@@ -311,6 +298,7 @@ static struct nf_hook_ops hwaddr_out_hook = {
 static int __init hwaddr_cache_init(void)
 {
 	int rc = 0;
+
 	hwaddr_cache = kmem_cache_create("hwaddr-cache",
 						sizeof(struct hwaddr_entry),
 						0, SLAB_HWCACHE_ALIGN, NULL);
