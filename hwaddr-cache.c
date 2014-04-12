@@ -108,30 +108,21 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 	return entry;
 }
 
-static struct hwaddr_entry *hwaddr_lookup_local_unsafe(__be32 local)
+static void hwaddr_del_entries(__be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
+
+	rcu_read_lock();
 	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, local)
 	{
 		if (entry->local == local)
 		{
-			return entry;
+			hash_del_rcu(&entry->node);
+			hwaddr_put(entry);
 		}
 	}
-
-	return NULL;
-}
-
-static struct hwaddr_entry *hwaddr_lookup_local(__be32 local)
-{
-	struct hwaddr_entry *entry = NULL;
-
-	rcu_read_lock();
-	entry = hwaddr_lookup_local_unsafe(local);
 	rcu_read_unlock();
-
-	return entry;
 }
 
 static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
@@ -204,7 +195,7 @@ static void hwaddr_cache_release(void)
 	kmem_cache_destroy(hwaddr_cache);
 }
 
-void clear_cache(__be32 local)
+void hwaddr_clear_cache(__be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -214,12 +205,7 @@ void clear_cache(__be32 local)
 	}
 	else
 	{
-		while ((entry = hwaddr_lookup_local(local)) != NULL)
-		{
-			synchronize_rcu();
-			hash_del_rcu(&entry->node);
-			hwaddr_put(entry);
-		}
+		hwaddr_del_entries(local);
 	}
 }
 
