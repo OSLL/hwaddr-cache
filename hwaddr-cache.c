@@ -111,10 +111,12 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 static void hwaddr_del_entries(__be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
 	struct hlist_node *list = NULL;
+	int index = 0;
 
-	rcu_read_lock();
-	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, local)
+	synchronize_rcu();
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, node)
 	{
 		if (entry->local == local)
 		{
@@ -122,7 +124,6 @@ static void hwaddr_del_entries(__be32 local)
 			hwaddr_put(entry);
 		}
 	}
-	rcu_read_unlock();
 }
 
 static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
