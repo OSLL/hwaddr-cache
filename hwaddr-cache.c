@@ -333,7 +333,12 @@ static struct notifier_block aufs_inetaddr_notifier = {
 static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
 			void *ptr)
 {
-	struct net_device const* const dev = netdev_notifier_info_to_dev(ptr);
+	struct net_device const* const dev =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
+				(struct net_device const *)ptr;
+#else
+				netdev_notifier_info_to_dev(ptr);
+#endif
 	struct in_device const* const in_dev = __in_dev_get_rtnl(dev);
 
 	if (!in_dev)
