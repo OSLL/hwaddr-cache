@@ -23,6 +23,7 @@ static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 
+
 static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
 			u8 const *ha, unsigned ha_len)
 {
@@ -208,6 +209,14 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
+static struct nf_hook_ops hwaddr_in_hook = {
+	.hook = hwaddr_in_hook_fn,
+	.owner = THIS_MODULE,
+	.pf = NFPROTO_IPV4,
+	.hooknum = NF_INET_LOCAL_IN,
+	.priority = NF_IP_PRI_LAST
+};
+
 static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
@@ -290,14 +299,6 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-static struct nf_hook_ops hwaddr_in_hook = {
-	.hook = hwaddr_in_hook_fn,
-	.owner = THIS_MODULE,
-	.pf = NFPROTO_IPV4,
-	.hooknum = NF_INET_LOCAL_IN,
-	.priority = NF_IP_PRI_LAST
-};
-
 static struct nf_hook_ops hwaddr_out_hook = {
 	.hook = hwaddr_out_hook_fn,
 	.owner = THIS_MODULE,
@@ -305,6 +306,9 @@ static struct nf_hook_ops hwaddr_out_hook = {
 	.hooknum = NF_INET_LOCAL_OUT,
 	.priority = NF_IP_PRI_LAST
 };
+
+
+/* network interface notifiers */
 
 static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
 			void *ptr)
@@ -354,6 +358,9 @@ static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
 static struct notifier_block aufs_netdev_notifier = {
 	.notifier_call = aufs_netdev_event,
 };
+
+
+/* hwaddr load and cleanup routines */
 
 static int __init hwaddr_cache_init(void)
 {
