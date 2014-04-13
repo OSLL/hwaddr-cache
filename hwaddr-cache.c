@@ -227,7 +227,7 @@ static struct rtable *update_route(struct sk_buff *skb,
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
 	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
-				nhdr->saddr, nhdr->tos, out->ifindex);
+				nhdr->saddr, nhdr->tos | RTO_ONLINK, out->ifindex);
 
 	if (!IS_ERR(rt))
 	{
@@ -352,8 +352,7 @@ static int __init hwaddr_cache_init(void)
 	register_inetaddr_notifier(&aufs_inetaddr_notifier);
 
 	hwaddr_cache = kmem_cache_create("hwaddr-cache",
-						sizeof(struct hwaddr_entry),
-						0, SLAB_HWCACHE_ALIGN, NULL);
+				sizeof(struct hwaddr_entry), 0, SLAB_HWCACHE_ALIGN, NULL);
 
 	if (!hwaddr_cache)
 	{
