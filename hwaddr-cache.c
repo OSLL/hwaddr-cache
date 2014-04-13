@@ -150,7 +150,7 @@ static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
 	hwaddr_put(entry);
 }
 
-static void hwaddr_cache_release(void)
+static void hwaddr_slab_destroy(void)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *tmp = NULL;
@@ -165,6 +165,17 @@ static void hwaddr_cache_release(void)
 	}
 
 	kmem_cache_destroy(hwaddr_cache);
+}
+
+static int hwaddr_slab_create(void)
+{
+	hwaddr_cache = kmem_cache_create("hwaddr-cache",
+				sizeof(struct hwaddr_entry), 0, SLAB_HWCACHE_ALIGN, NULL);
+
+	if (!hwaddr_cache)
+		return -ENOMEM;
+
+	return 0;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
@@ -351,43 +362,48 @@ static int __init hwaddr_cache_init(void)
 	register_netdevice_notifier(&aufs_netdev_notifier);
 	register_inetaddr_notifier(&aufs_inetaddr_notifier);
 
-	hwaddr_cache = kmem_cache_create("hwaddr-cache",
-				sizeof(struct hwaddr_entry), 0, SLAB_HWCACHE_ALIGN, NULL);
-
-	if (!hwaddr_cache)
+	rc = hwaddr_slab_create();
+	if (rc)
 	{
 		pr_err("cannot create slab cache for hwaddr module\n");
-		return -ENOMEM;
+		goto free_notifiers;
 	}
 
 	rc = nf_register_hook(&hwaddr_in_hook);
 	if (rc)
 	{
 		pr_err("cannot register netfilter input hook\n");
-		hwaddr_cache_release();
-		return rc;
+		goto free_cache;
 	}
 
 	rc = nf_register_hook(&hwaddr_out_hook);
 	if (rc)
 	{
 		pr_err("cannot register netfilter output hook\n");
-		nf_unregister_hook(&hwaddr_in_hook);
-		hwaddr_cache_release();
-		return rc;
+		goto free_in;
 	}
 
 	pr_debug("hwaddr-cache module loaded\n");
-
 	return 0;
+
+free_in:
+	nf_unregister_hook(&hwaddr_in_hook);
+
+free_cache:
+	hwaddr_slab_destroy();
+
+free_notifiers:
+	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
+	unregister_netdevice_notifier(&aufs_netdev_notifier);
+
+	return rc;
 }
 
 static void __exit hwaddr_cache_cleanup(void)
 {
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
-	hwaddr_cache_release();
-
+	hwaddr_slab_destroy();
 	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
 	unregister_netdevice_notifier(&aufs_netdev_notifier);
 
