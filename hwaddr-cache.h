@@ -12,8 +12,6 @@
 struct hwaddr_entry
 {
 	struct hlist_node	node;
-
-	atomic_t			refcnt;
 	__be32				local;
 	__be32				remote;
 	rwlock_t			lock;	

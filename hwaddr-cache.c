@@ -23,11 +23,17 @@ static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
 
+<<<<<<< HEAD
 static void init_hwaddr_entry(struct hwaddr_entry *entry,
 				__be32 remote,
 				__be32 local,
 				u8 const *ha,
 				unsigned ha_len)
+=======
+
+static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
+			u8 const *ha, unsigned ha_len)
+>>>>>>> upstream/master
 {
 	entry->remote = remote;
 	entry->local = local;
@@ -42,10 +48,15 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
+<<<<<<< HEAD
 static struct hwaddr_entry *hwaddr_alloc(__be32 remote,
 						__be32 local,
 						u8 const *ha,
 						unsigned ha_len)
+=======
+static struct hwaddr_entry *hwaddr_alloc(__be32 remote, u8 const *ha,
+			unsigned ha_len)
+>>>>>>> upstream/master
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -56,47 +67,31 @@ static struct hwaddr_entry *hwaddr_alloc(__be32 remote,
 	if (!entry)
 		return NULL;
 
-	atomic_set(&entry->refcnt, 1);
 	rwlock_init(&entry->lock);
+<<<<<<< HEAD
 
 	init_hwaddr_entry(entry, remote, local, ha, ha_len);
+=======
+	init_hwaddr_entry(entry, remote, ha, ha_len);
+>>>>>>> upstream/master
 
 	return entry;
 }
 
-static void hwaddr_hold(struct hwaddr_entry *entry)
-{
-	if (!entry)
-		return;
-
-	atomic_inc(&entry->refcnt);
-}
-
-static void hwaddr_put(struct hwaddr_entry *entry)
-{
-	if (!entry)
-		return;
-
-	if (atomic_dec_and_test(&entry->refcnt))
-		hwaddr_free(entry);
-}
-
-static struct hwaddr_entry *hwaddr_lookup_unsafe(__be32 remote)
+static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
 	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, remote)
 	{
 		if (entry->remote == remote)
-		{
-			hwaddr_hold(entry);
 			return entry;
-		}
 	}
 
 	return NULL;
 }
 
+<<<<<<< HEAD
 static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 {
 	struct hwaddr_entry *entry = NULL;
@@ -130,6 +125,10 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 						__be32 local,
 						u8 const *ha,
 						unsigned ha_len)
+=======
+static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, u8 const *ha,
+			unsigned ha_len)
+>>>>>>> upstream/master
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -144,10 +143,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 
 	entry = hwaddr_alloc(remote, local, ha, ha_len);
 	if (entry)
-	{
 		hash_add_rcu(hwaddr_hash_table, &entry->node, remote);
-		hwaddr_hold(entry);
-	}
 
 	spin_unlock(&hwaddr_hash_table_lock);
 
@@ -156,6 +152,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote,
 	return entry;
 }
 
+<<<<<<< HEAD
 static void hwaddr_update(__be32 remote,
 				__be32 local,
 				u8 const *ha,
@@ -164,22 +161,38 @@ static void hwaddr_update(__be32 remote,
 	struct hwaddr_entry *entry = hwaddr_lookup(remote);
 	if (!entry)
 		entry = hwaddr_create_slow(remote, local, ha, ha_len);
+=======
+static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
+{
+	struct hwaddr_entry *entry = NULL;
+	
+	rcu_read_lock();
+>>>>>>> upstream/master
 
+	entry = hwaddr_lookup(remote);
 	if (!entry)
-		return;
+		entry = hwaddr_create_slow(remote, ha, ha_len);
 
-	write_lock(&entry->lock);
-	if (entry->ha_len != ha_len || memcmp(entry->ha, ha, ha_len))
+	if (entry)
 	{
+<<<<<<< HEAD
 		pr_debug("update entry for %pI4\n", &entry->remote);
 		init_hwaddr_entry(entry, remote, local, ha, ha_len);
+=======
+		write_lock(&entry->lock);
+		if (entry->ha_len != ha_len || memcmp(entry->ha, ha, ha_len))
+		{
+			pr_debug("update entry for %pI4\n", &entry->remote);
+			init_hwaddr_entry(entry, remote, ha, ha_len);
+		}
+		write_unlock(&entry->lock);
+>>>>>>> upstream/master
 	}
-	write_unlock(&entry->lock);
 
-	hwaddr_put(entry);
+	rcu_read_unlock();
 }
 
-static void hwaddr_cache_release(void)
+static void hwaddr_slab_destroy(void)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *tmp = NULL;
@@ -190,12 +203,13 @@ static void hwaddr_cache_release(void)
 	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, node)
 	{
 		hash_del_rcu(&entry->node);
-		hwaddr_put(entry);
+		hwaddr_free(entry);
 	}
 
 	kmem_cache_destroy(hwaddr_cache);
 }
 
+<<<<<<< HEAD
 void hwaddr_clear_cache(__be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
@@ -208,6 +222,17 @@ void hwaddr_clear_cache(__be32 local)
 	{
 		hwaddr_del_entries(local);
 	}
+=======
+static int hwaddr_slab_create(void)
+{
+	hwaddr_cache = kmem_cache_create("hwaddr-cache",
+				sizeof(struct hwaddr_entry), 0, SLAB_HWCACHE_ALIGN, NULL);
+
+	if (!hwaddr_cache)
+		return -ENOMEM;
+
+	return 0;
+>>>>>>> upstream/master
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
@@ -215,10 +240,8 @@ static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
-					struct sk_buff *skb,
-					struct net_device const *in,
-					struct net_device const *out,
-					int (*okfn)(struct sk_buff *))
+			struct sk_buff *skb, struct net_device const *in,
+			struct net_device const *out, int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct ethhdr *lhdr = NULL;
@@ -241,6 +264,14 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 
 	return NF_ACCEPT;
 }
+
+static struct nf_hook_ops hwaddr_in_hook = {
+	.hook = hwaddr_in_hook_fn,
+	.owner = THIS_MODULE,
+	.pf = NFPROTO_IPV4,
+	.hooknum = NF_INET_LOCAL_IN,
+	.priority = NF_IP_PRI_LAST
+};
 
 static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
@@ -267,15 +298,11 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 }
 
 static struct rtable *update_route(struct sk_buff *skb,
-					struct net_device const *out,
-					struct hwaddr_entry *entry)
+			struct net_device const *out, struct hwaddr_entry *entry)
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
-	struct rtable *const rt = ip_route_output(dev_net(out),
-							nhdr->daddr,
-							nhdr->saddr,
-							nhdr->tos,
-							out->ifindex);
+	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
+				nhdr->saddr, nhdr->tos | RTO_ONLINK, out->ifindex);
 
 	if (!IS_ERR(rt))
 	{
@@ -295,10 +322,8 @@ static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
 #else
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
-					struct sk_buff *skb,
-					struct net_device const *in,
-					struct net_device const *out,
-					int (*okfn)(struct sk_buff *))
+			struct sk_buff *skb, struct net_device const *in,
+			struct net_device const *out, int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct hwaddr_entry *entry = NULL;
@@ -308,34 +333,24 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	if (!out)
 		return NF_ACCEPT;
 
-	entry = hwaddr_lookup(nhdr->daddr);
-	if (!entry)
-		return NF_ACCEPT;
-
 	target = ip_dev_find(dev_net(out), nhdr->saddr);
 	if (!target)
-	{
-		hwaddr_put(entry);
 		return NF_ACCEPT;
-	}
 
-	rt = update_route(skb, target, entry);
-	if (IS_ERR(rt))
-		pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
+	rcu_read_lock();
+	entry = hwaddr_lookup(nhdr->daddr);
+	if (entry)
+	{
+		rt = update_route(skb, target, entry);
+		if (IS_ERR(rt))
+			pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
+	}
+	rcu_read_unlock();
 
 	dev_put(target);
-	hwaddr_put(entry);
 
 	return NF_ACCEPT;
 }
-
-static struct nf_hook_ops hwaddr_in_hook = {
-	.hook = hwaddr_in_hook_fn,
-	.owner = THIS_MODULE,
-	.pf = NFPROTO_IPV4,
-	.hooknum = NF_INET_LOCAL_IN,
-	.priority = NF_IP_PRI_LAST
-};
 
 static struct nf_hook_ops hwaddr_out_hook = {
 	.hook = hwaddr_out_hook_fn,
@@ -345,46 +360,117 @@ static struct nf_hook_ops hwaddr_out_hook = {
 	.priority = NF_IP_PRI_LAST
 };
 
+
+/* network interface notifiers */
+
+static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
+{
+	struct in_ifaddr const* const ifa = (struct in_ifaddr *)ptr;
+	switch (event)
+	{
+	case NETDEV_UP:
+		pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
+		break;
+	case NETDEV_DOWN:
+		pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block aufs_inetaddr_notifier = {
+	.notifier_call = aufs_inetaddr_event,
+};
+
+static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
+{
+	struct net_device const* const dev =
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
+				(struct net_device const *)ptr;
+#else
+				netdev_notifier_info_to_dev(ptr);
+#endif
+	struct in_device const* const in_dev = __in_dev_get_rtnl(dev);
+
+	if (!in_dev)
+		return NOTIFY_DONE;
+
+	switch (event)
+	{
+	case NETDEV_UP:
+		for_ifa(in_dev) {
+			pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
+		} endfor_ifa(in_dev);
+		break;
+	case NETDEV_DOWN:
+		for_ifa(in_dev) {
+			pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
+		} endfor_ifa(in_dev);
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block aufs_netdev_notifier = {
+	.notifier_call = aufs_netdev_event,
+};
+
+
+/* hwaddr load and cleanup routines */
+
 static int __init hwaddr_cache_init(void)
 {
 	int rc = 0;
-	hwaddr_cache = kmem_cache_create("hwaddr-cache",
-						sizeof(struct hwaddr_entry),
-						0, SLAB_HWCACHE_ALIGN, NULL);
 
-	if (!hwaddr_cache)
+	register_netdevice_notifier(&aufs_netdev_notifier);
+	register_inetaddr_notifier(&aufs_inetaddr_notifier);
+
+	rc = hwaddr_slab_create();
+	if (rc)
 	{
 		pr_err("cannot create slab cache for hwaddr module\n");
-		return -ENOMEM;
+		goto free_notifiers;
 	}
 
 	rc = nf_register_hook(&hwaddr_in_hook);
 	if (rc)
 	{
 		pr_err("cannot register netfilter input hook\n");
-		hwaddr_cache_release();
-		return rc;
+		goto free_cache;
 	}
 
 	rc = nf_register_hook(&hwaddr_out_hook);
 	if (rc)
 	{
 		pr_err("cannot register netfilter output hook\n");
-		nf_unregister_hook(&hwaddr_in_hook);
-		hwaddr_cache_release();
-		return rc;
+		goto free_in;
 	}
 
 	pr_debug("hwaddr-cache module loaded\n");
-
 	return 0;
+
+free_in:
+	nf_unregister_hook(&hwaddr_in_hook);
+
+free_cache:
+	hwaddr_slab_destroy();
+
+free_notifiers:
+	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
+	unregister_netdevice_notifier(&aufs_netdev_notifier);
+
+	return rc;
 }
 
 static void __exit hwaddr_cache_cleanup(void)
 {
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
-	hwaddr_cache_release();
+	hwaddr_slab_destroy();
+	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
+	unregister_netdevice_notifier(&aufs_netdev_notifier);
 
 	pr_debug("hwaddr-cache module unloaded\n");
 }
