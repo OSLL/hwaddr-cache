@@ -138,40 +138,6 @@ static void hwaddr_slab_destroy(void)
 	kmem_cache_destroy(hwaddr_cache);
 }
 
-static void hwaddr_del_entries(__be32 local)
-{
-	struct hwaddr_entry *entry = NULL;
-	struct hlist_node *tmp = NULL;
-	struct hlist_node *list = NULL;
-	int index = 0;
-
-	synchronize_rcu();
-	rcu_read_lock();
-	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, node)
-	{
-		if (entry->local == local)
-		{
-			hash_del_rcu(&entry->node);
-			hwaddr_free(entry);
-		}
-	}
-	rcu_read_unlock();
-}
-
-void hwaddr_clear_cache(__be32 local)
-{
-	struct hwaddr_entry *entry = NULL;
-
-	if (local == htonl(INADDR_ANY))
-	{
-		hwaddr_slab_destroy();
-	}
-	else
-	{
-		hwaddr_del_entries(local);
-	}
-}
-
 static int hwaddr_slab_create(void)
 {
 	hwaddr_cache = kmem_cache_create("hwaddr-cache",
