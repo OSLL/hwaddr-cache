@@ -105,7 +105,7 @@ static void hwaddr_update(__be32 remote, __be32 local, u8 const *ha, unsigned ha
 
 	entry = hwaddr_lookup(remote);
 	if (!entry)
-		entry = hwaddr_create_slow(remote, ha, ha_len);
+		entry = hwaddr_create_slow(remote, local, ha, ha_len);
 
 	if (entry)
 	{
