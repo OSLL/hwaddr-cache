@@ -22,8 +22,6 @@ static struct kmem_cache *hwaddr_cache;
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
-
-
 static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote, __be32 local,
 			u8 const *ha, unsigned ha_len)
 {
