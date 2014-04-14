@@ -22,6 +22,8 @@ static struct kmem_cache *hwaddr_cache;
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
+
+
 static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
 			u8 const *ha, unsigned ha_len)
 {
@@ -59,8 +61,7 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
-	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list, node,
-				remote)
+	hwaddr_hash_for_each_rcu(hwaddr_hash_table, entry, list, node, remote)
 	{
 		if (entry->remote == remote)
 			return entry;
@@ -329,58 +330,6 @@ static struct notifier_block aufs_netdev_notifier = {
 };
 
 
-/* procfs interface */
-
-static struct proc_dir_entry *proc_info_root = NULL;
-static char const proc_info_root_name[] = "hwaddr";
-
-static int hwaddr_show_cache(struct seq_file *sf, void *unused)
-{
-	struct hwaddr_entry *entry = NULL;
-	struct hlist_node *list = NULL;
-	int index = 0;
-
-	rcu_read_lock();
-	hwaddr_hash_for_each_rcu(hwaddr_hash_table, index, list, entry, node)
-	{
-		seq_printf(sf, "ip = %pI4, hwaddr = %pM\n", &entry->remote, entry->ha);
-	}
-	rcu_read_unlock();
-
-	return 0;
-}
-
-static int hwaddr_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, hwaddr_show_cache, NULL);
-}
-
-static struct file_operations const hwaddr_proc_ops = {
-	.open = hwaddr_proc_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
-static int hwaddr_proc_create(void)
-{
-	proc_info_root = proc_mkdir(proc_info_root_name, NULL);
-	if (!proc_info_root)
-		return -ENOMEM;
-
-	proc_create_data("cache", 0, proc_info_root, &hwaddr_proc_ops, NULL);
-
-	return 0;
-}
-
-static void hwaddr_proc_destroy(void)
-{
-	remove_proc_subtree("cache", proc_info_root);
-	proc_info_root = NULL;
-	remove_proc_entry(proc_info_root_name, NULL);
-}
-
-
 /* hwaddr load and cleanup routines */
 
 static int __init hwaddr_cache_init(void)
@@ -390,18 +339,11 @@ static int __init hwaddr_cache_init(void)
 	register_netdevice_notifier(&aufs_netdev_notifier);
 	register_inetaddr_notifier(&aufs_inetaddr_notifier);
 
-	rc = hwaddr_proc_create();
-	if (rc)
-	{
-		pr_err("cannot create procfs entry\n");
-		goto free_notifiers;
-	}
-
 	rc = hwaddr_slab_create();
 	if (rc)
 	{
 		pr_err("cannot create slab cache for hwaddr module\n");
-		goto free_proc;
+		goto free_notifiers;
 	}
 
 	rc = nf_register_hook(&hwaddr_in_hook);
@@ -427,9 +369,6 @@ free_in:
 free_cache:
 	hwaddr_slab_destroy();
 
-free_proc:
-	hwaddr_proc_destroy();
-
 free_notifiers:
 	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
 	unregister_netdevice_notifier(&aufs_netdev_notifier);
@@ -442,7 +381,6 @@ static void __exit hwaddr_cache_cleanup(void)
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
 	hwaddr_slab_destroy();
-	hwaddr_proc_destroy();
 	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
 	unregister_netdevice_notifier(&aufs_netdev_notifier);
 
