@@ -375,9 +375,9 @@ static int hwaddr_proc_create(void)
 
 static void hwaddr_proc_destroy(void)
 {
-	remove_proc_subtree("cache", proc_info_root);
-	proc_info_root = NULL;
+	remove_proc_entry("cache", proc_info_root);
 	remove_proc_entry(proc_info_root_name, NULL);
+	proc_info_root = NULL;
 }
 
 
