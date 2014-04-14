@@ -16,7 +16,7 @@ struct hwaddr_entry
 	__be32				remote;
 	rwlock_t			lock;	
 	unsigned			ha_len;
-	u8					ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
+	u8				ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
 };
 
 #endif /*__HWADDR_CACHE_H__*/
