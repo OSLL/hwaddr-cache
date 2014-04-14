@@ -22,10 +22,11 @@ static struct kmem_cache *hwaddr_cache;
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
-static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
+static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote, __be32 local,
 			u8 const *ha, unsigned ha_len)
 {
 	entry->remote = remote;
+	entry->local = local;
 	entry->ha_len = ha_len;
 	memcpy(entry->ha, ha, ha_len);
 }
@@ -37,7 +38,7 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-static struct hwaddr_entry *hwaddr_alloc(__be32 remote, u8 const *ha,
+static struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
 			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
@@ -50,7 +51,7 @@ static struct hwaddr_entry *hwaddr_alloc(__be32 remote, u8 const *ha,
 		return NULL;
 
 	rwlock_init(&entry->lock);
-	init_hwaddr_entry(entry, remote, ha, ha_len);
+	init_hwaddr_entry(entry, remote, local, ha, ha_len);
 
 	return entry;
 }
@@ -69,7 +70,7 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 	return NULL;
 }
 
-static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, u8 const *ha,
+static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local, u8 const *ha,
 			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
@@ -83,7 +84,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, u8 const *ha,
 		return entry;
 	}
 
-	entry = hwaddr_alloc(remote, ha, ha_len);
+	entry = hwaddr_alloc(remote, local, ha, ha_len);
 	if (entry)
 		hash_add_rcu(hwaddr_hash_table, &entry->node, remote);
 
@@ -94,7 +95,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, u8 const *ha,
 	return entry;
 }
 
-static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
+static void hwaddr_update(__be32 remote, __be32 local, u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 	
@@ -102,7 +103,7 @@ static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
 
 	entry = hwaddr_lookup(remote);
 	if (!entry)
-		entry = hwaddr_create_slow(remote, ha, ha_len);
+		entry = hwaddr_create_slow(remote, local, ha, ha_len);
 
 	if (entry)
 	{
@@ -110,7 +111,7 @@ static void hwaddr_update(__be32 remote, u8 const *ha, unsigned ha_len)
 		if (entry->ha_len != ha_len || memcmp(entry->ha, ha, ha_len))
 		{
 			pr_debug("update entry for %pI4\n", &entry->remote);
-			init_hwaddr_entry(entry, remote, ha, ha_len);
+			init_hwaddr_entry(entry, remote, local, ha, ha_len);
 		}
 		write_unlock(&entry->lock);
 	}
@@ -171,7 +172,7 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_update(nhdr->saddr, lhdr->h_source, ETH_ALEN);
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source, ETH_ALEN);
 
 	return NF_ACCEPT;
 }
