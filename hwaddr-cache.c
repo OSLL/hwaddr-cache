@@ -189,7 +189,7 @@ static struct nf_hook_ops hwaddr_in_hook = {
 static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
-	struct neighbour *neigh = rt->dst._neighbour;
+	struct neighbour *neigh = rt->dst.neighbour;
 #else
 	struct neighbour *neigh = NULL;
 	__be32 next = 0;
