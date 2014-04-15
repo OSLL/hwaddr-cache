@@ -22,8 +22,8 @@ static struct kmem_cache *hwaddr_cache;
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 
-static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote, __be32 local,
-			u8 const *ha, unsigned ha_len)
+static void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
+			__be32 local, u8 const *ha, unsigned ha_len)
 {
 	entry->remote = remote;
 	entry->local = local;
@@ -38,8 +38,8 @@ static void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-static struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len)
+static struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local,
+			u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -70,8 +70,8 @@ static struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 	return NULL;
 }
 
-static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len)
+static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
+			u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -95,7 +95,8 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local, u8 
 	return entry;
 }
 
-static void hwaddr_update(__be32 remote, __be32 local, u8 const *ha, unsigned ha_len)
+static void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
+			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 	
