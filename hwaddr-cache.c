@@ -345,7 +345,8 @@ static int hwaddr_show_cache(struct seq_file *sf, void *unused)
 	rcu_read_lock();
 	hwaddr_hash_for_each_rcu(hwaddr_hash_table, index, list, entry, node)
 	{
-		seq_printf(sf, "ip = %pI4, hwaddr = %pM\n", &entry->remote, entry->ha);
+		seq_printf(sf, "local ip = %pI4, remote ip = %pI4, hwaddr = %pM\n",
+					&entry->local, &entry->remote, entry->ha);
 	}
 	rcu_read_unlock();
 
