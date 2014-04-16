@@ -120,20 +120,34 @@ static void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 	rcu_read_unlock();
 }
 
-static void hwaddr_slab_destroy(void)
+static void hwaddr_entry_free_callback(struct rcu_head *head)
 {
+	hwaddr_free(container_of(head, struct hwaddr_entry, rcu));
+}
+
+static void hwaddr_remove_entries(__be32 local)
+{
+	__be32 const ANY = htonl(INADDR_ANY);
+
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *tmp = NULL;
 	struct hlist_node *list = NULL;
 	int index = 0;
 
-	synchronize_rcu();
 	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, node)
 	{
-		hash_del_rcu(&entry->node);
-		hwaddr_free(entry);
+		if ((local == ANY) || (entry->local == local))
+		{
+			hash_del_rcu(&entry->node);
+			call_rcu(&entry->rcu, hwaddr_entry_free_callback);
+		}
 	}
+}
 
+static void hwaddr_slab_destroy(void)
+{
+	hwaddr_remove_entries(htonl(INADDR_ANY));
+	rcu_barrier();
 	kmem_cache_destroy(hwaddr_cache);
 }
 

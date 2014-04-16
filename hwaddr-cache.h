@@ -11,6 +11,7 @@
 
 struct hwaddr_entry
 {
+	struct rcu_head		rcu;
 	struct hlist_node	node;
 
 	__be32			local;
