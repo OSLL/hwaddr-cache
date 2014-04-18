@@ -1,6 +1,8 @@
 #ifndef HWADDR_HASHTABLE_H
 #define HWADDR_HASHTABLE_H
 
+#include <linux/version.h>
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
 
 #include "hashtable_old.h"
