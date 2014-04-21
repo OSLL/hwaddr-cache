@@ -5,6 +5,23 @@
 #include "hwaddr.h"
 #include "proc.h"
 
+static struct proc_dir_entry *proc_info_root = NULL;
+static char const proc_info_root_name[] = "hwaddr";
+
+static void port_folder_create(struct in_ifaddr const* const ifa) {
+	char buff[17];
+	struct proc_dir_entry* result;
+	sprintf(buff,"%pI4", &ifa->ifa_local);
+	result = proc_mkdir(buff, proc_info_root);
+	//ToDo: write "result" into hashtable?
+}
+
+static void port_folder_remove(struct in_ifaddr const* const ifa) {
+	char buff[17];
+	sprintf(buff,"%pI4", &ifa->ifa_local);
+	remove_proc_entry(buff, proc_info_root);
+}
+
 static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
 			void *ptr)
 {
@@ -12,9 +29,11 @@ static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
 	switch (event)
 	{
 	case NETDEV_UP:
+		port_folder_create(ifa);
 		pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
 		break;
 	case NETDEV_DOWN:
+		port_folder_remove(ifa);
 		pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
 		break;
 	}
@@ -43,11 +62,13 @@ static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
 	{
 	case NETDEV_UP:
 		for_ifa(in_dev) {
+			port_folder_create(ifa);
 			pr_debug("inet addr %pI4 up\n", &ifa->ifa_local);
 		} endfor_ifa(in_dev);
 		break;
 	case NETDEV_DOWN:
 		for_ifa(in_dev) {
+			port_folder_remove(ifa);
 			pr_debug("inet addr %pI4 down\n", &ifa->ifa_local);
 		} endfor_ifa(in_dev);
 		break;
@@ -70,10 +91,6 @@ static void hwaddr_unregister_notifiers(void)
 	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
 	unregister_netdevice_notifier(&aufs_netdev_notifier);
 }
-
-
-static struct proc_dir_entry *proc_info_root = NULL;
-static char const proc_info_root_name[] = "hwaddr";
 
 static void hwaddr_show_entry(struct hwaddr_entry *entry, void *data)
 {
