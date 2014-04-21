@@ -9,16 +9,16 @@ static struct proc_dir_entry *proc_info_root = NULL;
 static char const proc_info_root_name[] = "hwaddr";
 
 static void port_folder_create(struct in_ifaddr const* const ifa) {
-	char buff[17];
+	char buff[17];m
 	struct proc_dir_entry* result;
 	sprintf(buff,"%pI4", &ifa->ifa_local);
 	result = proc_mkdir(buff, proc_info_root);
-	//Write result into hashtable?
+	//ToDo: write "result" into hashtable?
 }
 
 static void port_folder_remove(struct in_ifaddr const* const ifa) {
 	char buff[17];
-	sprintf(buff,"%pI4", &ifa->ifa_local);
+	sprintf(buff,"%pI4", &ifa->ifa_local);0
 	remove_proc_entry(buff, proc_info_root);
 }
 
