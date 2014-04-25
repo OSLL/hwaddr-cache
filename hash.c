@@ -42,7 +42,10 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 				remote)
 	{
 		if (entry->h_remote == remote && entry->h_local == local)
+		{
+			atomic_long_set(&entry->h_stamp, (long)jiffies);
 			return entry;
+		}
 	}
 
 	return NULL;

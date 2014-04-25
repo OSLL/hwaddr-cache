@@ -11,7 +11,8 @@ struct hwaddr_common
 	struct rcu_head		h_rcu;
 	struct hlist_node	h_node;
 
-	unsigned long		h_stamp;
+	atomic_long_t		h_stamp;
+	u8					h_flags;
 	rwlock_t			h_lock;	
 	unsigned			h_ha_len;
 	u8					h_ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
@@ -26,6 +27,7 @@ struct hwaddr_entry
 	#define h_node			common.h_node
 
 	#define h_stamp			common.h_stamp
+	#define h_flag			common.h_flag
 	#define h_lock			common.h_lock
 	#define h_ha_len		common.h_ha_len
 	#define h_ha			common.h_ha
