@@ -15,7 +15,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
 	struct hwaddr_entry *entry = NULL;
 
 	spin_lock(&hwaddr_hash_table_lock);
-	entry = hwaddr_lookup(remote);
+	entry = hwaddr_lookup(remote, local);
 	if (entry)
 	{
 		spin_unlock(&hwaddr_hash_table_lock);
@@ -33,7 +33,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
 }
 
 
-struct hwaddr_entry *hwaddr_lookup(__be32 remote)
+struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
@@ -41,7 +41,7 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote)
 	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list, node,
 				remote)
 	{
-		if (entry->remote == remote)
+		if (entry->remote == remote && entry->local == local)
 			return entry;
 	}
 
@@ -55,7 +55,7 @@ void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 	struct hwaddr_entry *entry = NULL;
 	
 	rcu_read_lock();
-	entry = hwaddr_lookup(remote);
+	entry = hwaddr_lookup(remote, local);
 	if (!entry)
 		entry = hwaddr_create_slow(remote, local, ha, ha_len);
 
