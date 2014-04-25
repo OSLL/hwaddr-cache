@@ -3,32 +3,32 @@
 
 #include "cache.h"
 #include "hwaddr.h"
-#include "netfilter.h"
-#include "proc.h"
+#include "netfilter4.h"
+#include "proc4.h"
 
 static int __init hwaddr_cache_init(void)
 {
-	int rc = hwaddr_proc_create();
+	int rc = hwaddr_v4_proc_create();
 	if (rc)
 	{
 		pr_err("cannot create proc directory\n");
 		return rc;
 	}
 
-	rc = hwaddr_slab_create();
+	rc = hwaddr_v4_slab_create();
 	if (rc)
 	{
 		pr_err("cannot create slab cache\n");
-		hwaddr_proc_destroy();
+		hwaddr_v4_proc_destroy();
 		return rc;
 	}
 
-	rc = hwaddr_register_hooks();
+	rc = hwaddr_v4_register_hooks();
 	if (rc)
 	{
 		pr_err("cannot register netfilter hooks\n");
-		hwaddr_proc_destroy();
-		hwaddr_slab_destroy();
+		hwaddr_v4_proc_destroy();
+		hwaddr_v4_slab_destroy();
 		return rc;
 	}
 
@@ -38,9 +38,9 @@ static int __init hwaddr_cache_init(void)
 
 static void __exit hwaddr_cache_cleanup(void)
 {
-	hwaddr_unregister_hooks();
-	hwaddr_slab_destroy();
-	hwaddr_proc_destroy();
+	hwaddr_v4_unregister_hooks();
+	hwaddr_v4_slab_destroy();
+	hwaddr_v4_proc_destroy();
 
 	pr_debug("hwaddr-cache module unloaded\n");
 }
