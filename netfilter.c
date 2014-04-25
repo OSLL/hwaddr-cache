@@ -19,7 +19,8 @@ static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
-			struct net_device const *out, int (*okfn)(struct sk_buff *))
+			struct net_device const *out,
+			int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct ethhdr *lhdr = NULL;
@@ -38,7 +39,8 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source, ETH_ALEN);
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+					ETH_ALEN);
 
 	return NF_ACCEPT;
 }
@@ -68,11 +70,13 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 }
 
 static struct rtable *hwaddr_update_route(struct sk_buff *skb,
-			struct net_device const *out, struct hwaddr_entry *entry)
+			struct net_device const *out,
+			struct hwaddr_entry *entry)
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
 	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
-				nhdr->saddr, nhdr->tos | RTO_ONLINK, out->ifindex);
+				nhdr->saddr, nhdr->tos | RTO_ONLINK,
+				out->ifindex);
 
 	if (!IS_ERR(rt))
 	{
@@ -93,7 +97,8 @@ static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
-			struct net_device const *out, int (*okfn)(struct sk_buff *))
+			struct net_device const *out,
+			int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct hwaddr_entry *entry = NULL;
@@ -113,7 +118,8 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 	{
 		rt = hwaddr_update_route(skb, target, entry);
 		if (IS_ERR(rt))
-			pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
+			pr_warn("cannot reroute packet to %pI4\n",
+						&nhdr->daddr);
 	}
 	rcu_read_unlock();
 

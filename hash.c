@@ -38,8 +38,8 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
 
-	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list, h_node,
-				remote)
+	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list,
+				h_node, remote)
 	{
 		if (entry->h_remote == remote && entry->h_local == local)
 		{
@@ -65,7 +65,8 @@ void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 	if (entry)
 	{
 		write_lock(&entry->h_lock);
-		if (entry->h_ha_len != ha_len || memcmp(entry->h_ha, ha, ha_len))
+		if (entry->h_ha_len != ha_len ||
+					memcmp(entry->h_ha, ha, ha_len))
 		{
 			pr_debug("update entry for %pI4\n", &entry->h_remote);
 			init_hwaddr_entry(entry, remote, local, ha, ha_len);
@@ -91,7 +92,8 @@ void hwaddr_remove_entries(__be32 local)
 	int index = 0;
 
 	spin_lock(&hwaddr_hash_table_lock);
-	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry, h_node)
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
+				h_node)
 	{
 		if ((local == ANY) || (entry->h_local == local))
 		{
