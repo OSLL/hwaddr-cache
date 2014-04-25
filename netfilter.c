@@ -45,7 +45,8 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
+static struct neighbour *hwaddr_neighbour(struct rtable *rt,
+			struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
 	struct neighbour *neigh = rt->dst.neighbour;
@@ -62,7 +63,14 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 #endif
 
 	if (IS_ERR(neigh))
-		return;
+		return NULL;
+
+	return neigh;
+}
+
+static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
+{
+	struct neighbour *const neigh = hwaddr_neighbour(rt, entry);
 
 	read_lock(&entry->h_lock);
 	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
