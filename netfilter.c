@@ -52,7 +52,7 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 	__be32 next = 0;
 
 	rcu_read_lock_bh();
-	next = rt_nexthop(rt, entry->remote);
+	next = rt_nexthop(rt, entry->h_remote);
 	neigh = __ipv4_neigh_lookup_noref(rt->dst.dev, next);
 	if (IS_ERR_OR_NULL(neigh))
 		neigh = __neigh_create(&arp_tbl, &next, rt->dst.dev, false);
@@ -62,9 +62,9 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 	if (IS_ERR(neigh))
 		return;
 
-	read_lock(&entry->lock);
-	neigh_update(neigh, entry->ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
-	read_unlock(&entry->lock);
+	read_lock(&entry->h_lock);
+	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
+	read_unlock(&entry->h_lock);
 }
 
 static struct rtable *hwaddr_update_route(struct sk_buff *skb,

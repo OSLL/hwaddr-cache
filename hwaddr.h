@@ -6,25 +6,41 @@
 #include <linux/rwlock.h>
 #include <linux/string.h>
 
+struct hwaddr_common
+{
+	struct rcu_head		h_rcu;
+	struct hlist_node	h_node;
+
+	unsigned long		h_stamp;
+	rwlock_t			h_lock;	
+	unsigned			h_ha_len;
+	u8					h_ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
+
+};
+
 struct hwaddr_entry
 {
-	struct rcu_head		rcu;
-	struct hlist_node	node;
+	struct hwaddr_common	common;
 
-	__be32			local;
-	__be32			remote;
-	rwlock_t		lock;	
-	unsigned		ha_len;
-	u8			ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
+	#define h_rcu			common.h_rcu
+	#define h_node			common.h_node
+
+	#define h_stamp			common.h_stamp
+	#define h_lock			common.h_lock
+	#define h_ha_len		common.h_ha_len
+	#define h_ha			common.h_ha
+
+	__be32					h_local;
+	__be32					h_remote;
 };
 
 static inline void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
 			__be32 local, u8 const *ha, unsigned ha_len)
 {
-	entry->remote = remote;
-	entry->local = local;
-	entry->ha_len = ha_len;
-	memcpy(entry->ha, ha, ha_len);
+	entry->h_remote = remote;
+	entry->h_local = local;
+	entry->h_ha_len = ha_len;
+	memcpy(entry->h_ha, ha, ha_len);
 }
 
 void hwaddr_slab_destroy(void);

@@ -26,7 +26,7 @@ int hwaddr_slab_create(void)
 
 void hwaddr_free(struct hwaddr_entry *entry)
 {
-	pr_debug("freeing entry for %pI4\n", &entry->remote);
+	pr_debug("freeing entry for %pI4\n", &entry->h_remote);
 			
 	kmem_cache_free(hwaddr_cache, entry);
 }
@@ -43,7 +43,7 @@ struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local,
 	if (!entry)
 		return NULL;
 
-	rwlock_init(&entry->lock);
+	rwlock_init(&entry->h_lock);
 	init_hwaddr_entry(entry, remote, local, ha, ha_len);
 
 	return entry;
