@@ -6,6 +6,8 @@
 #include <linux/rwlock.h>
 #include <linux/string.h>
 
+#define HW_PERSIST	0x01
+
 struct hwaddr_common
 {
 	struct rcu_head		h_rcu;

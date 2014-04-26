@@ -1,10 +1,21 @@
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include "cache.h"
 #include "hwaddr.h"
 #include "netfilter.h"
 #include "proc.h"
+
+static unsigned long hwaddr_persistent_timeout = 120;
+module_param(hwaddr_persistent_timeout, ulong, 0);
+MODULE_PARM_DESC(hwaddr_persistent_timeout,
+			"Timeout for persistent hwaddr cache entries");
+
+static unsigned long hwaddr_timeout = 2;
+module_param(hwaddr_timeout, ulong, 0);
+MODULE_PARM_DESC(hwaddr_timeout, "Timeout for hwaddr cache entries");
+
 
 static int __init hwaddr_cache_init(void)
 {
