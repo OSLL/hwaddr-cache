@@ -10,8 +10,8 @@
 #include <net/neighbour.h>
 #include <net/route.h>
 
+#include "hash.h"
 #include "hwaddr.h"
-#include "hash4.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
@@ -39,14 +39,14 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_v4_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
 					ETH_ALEN);
 
 	return NF_ACCEPT;
 }
 
-static struct neighbour *hwaddr_arp_neighbour(struct rtable *rt,
-			struct hwaddr_v4_entry *entry)
+static struct neighbour *hwaddr_neighbour(struct rtable *rt,
+			struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
 	struct neighbour *neigh = rt->dst.neighbour;
@@ -68,20 +68,18 @@ static struct neighbour *hwaddr_arp_neighbour(struct rtable *rt,
 	return neigh;
 }
 
-static void hwaddr_ensure_neigh(struct rtable *rt,
-			struct hwaddr_v4_entry *entry)
+static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
-	struct neighbour *const neigh = hwaddr_arp_neighbour(rt, entry);
+	struct neighbour *const neigh = hwaddr_neighbour(rt, entry);
 
-	read_lock(&entry->common.h_lock);
-	neigh_update(neigh, entry->common.h_ha, NUD_NOARP,
-				NEIGH_UPDATE_F_OVERRIDE);
-	read_unlock(&entry->common.h_lock);
+	read_lock(&entry->h_lock);
+	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
+	read_unlock(&entry->h_lock);
 }
 
 static struct rtable *hwaddr_update_route(struct sk_buff *skb,
 			struct net_device const *out,
-			struct hwaddr_v4_entry *entry)
+			struct hwaddr_entry *entry)
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
 	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
@@ -111,7 +109,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 			int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
-	struct hwaddr_v4_entry *entry = NULL;
+	struct hwaddr_entry *entry = NULL;
 	struct rtable *rt = NULL;
 	struct iphdr const *const nhdr = ip_hdr(skb);
 
@@ -123,7 +121,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	rcu_read_lock();
-	entry = hwaddr_v4_lookup(nhdr->daddr, nhdr->saddr);
+	entry = hwaddr_lookup(nhdr->daddr, nhdr->saddr);
 	if (entry)
 	{
 		rt = hwaddr_update_route(skb, target, entry);
@@ -156,7 +154,7 @@ static struct nf_hook_ops hwaddr_out_hook = {
 };
 
 
-int hwaddr_v4_register_hooks(void)
+int hwaddr_register_hooks(void)
 {
 	int rc = nf_register_hook(&hwaddr_in_hook);
 	if (rc)
@@ -169,7 +167,7 @@ int hwaddr_v4_register_hooks(void)
 	return rc;
 }
 
-void hwaddr_v4_unregister_hooks(void)
+void hwaddr_unregister_hooks(void)
 {
 	nf_unregister_hook(&hwaddr_out_hook);
 	nf_unregister_hook(&hwaddr_in_hook);
