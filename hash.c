@@ -27,7 +27,8 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
 		hash_add_rcu(hwaddr_hash_table, &entry->h_node, remote);
 	spin_unlock(&hwaddr_hash_table_lock);
 
-	pr_debug("create entry for remote ip = %pI4\n", &remote);
+	pr_debug("create entry for remote ip = %pI4 and local ip = %pI4\n",
+				&remote, &local);
 
 	return entry;
 }
@@ -68,8 +69,12 @@ void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 		if (entry->h_ha_len != ha_len ||
 					memcmp(entry->h_ha, ha, ha_len))
 		{
-			pr_debug("update entry for %pI4\n", &entry->h_remote);
-			init_hwaddr_entry(entry, remote, local, ha, ha_len);
+			pr_debug("update entry for remote %pI4"
+						"and local %pI4\n",
+						&entry->h_remote,
+						&entry->h_local);
+
+			init_hwaddr_entry(entry, ha, ha_len);
 		}
 		write_unlock(&entry->h_lock);
 	}
