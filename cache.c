@@ -3,6 +3,7 @@
 #include <linux/moduleparam.h>
 
 #include "cache.h"
+#include "hash.h"
 #include "hwaddr.h"
 #include "netfilter.h"
 #include "proc.h"
@@ -23,7 +24,10 @@ static struct delayed_work hwaddr_gc_work;
 static void hwaddr_gc_worker(struct work_struct *unused)
 {
 	(void)unused;
-	pr_debug("Hwaddr GC Work!\n");
+	pr_debug("starting hwaddr gc\n");
+	hwaddr_remove_old_entries(hwaddr_timeout * 60,
+				hwaddr_persistent_timeout * 60);
+	pr_debug("hwaddr gc finished\n");
 	schedule_delayed_work(&hwaddr_gc_work, hwaddr_timeout * 60 * HZ);
 }
 
