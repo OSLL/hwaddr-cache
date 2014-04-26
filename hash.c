@@ -69,7 +69,7 @@ void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 					memcmp(entry->h_ha, ha, ha_len))
 		{
 			pr_debug("update entry for %pI4\n", &entry->h_remote);
-			init_hwaddr_entry(entry, remote, local, ha, ha_len);
+			init_hwaddr_entry(entry, ha, ha_len);
 		}
 		write_unlock(&entry->h_lock);
 	}

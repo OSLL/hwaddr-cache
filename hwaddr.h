@@ -35,11 +35,9 @@ struct hwaddr_entry
 	__be32			h_remote;
 };
 
-static inline void init_hwaddr_entry(struct hwaddr_entry *entry, __be32 remote,
-			__be32 local, u8 const *ha, unsigned ha_len)
+static inline void init_hwaddr_entry(struct hwaddr_entry *entry, u8 const *ha,
+			unsigned ha_len)
 {
-	entry->h_remote = remote;
-	entry->h_local = local;
 	entry->h_ha_len = ha_len;
 	memcpy(entry->h_ha, ha, ha_len);
 }
