@@ -43,7 +43,7 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 	{
 		if (entry->h_remote == remote && entry->h_local == local)
 		{
-			atomic_long_set(&entry->h_stamp, (long)jiffies);
+			atomic_long_set(&entry->h_stamp, (long)get_seconds());
 			return entry;
 		}
 	}
@@ -100,6 +100,33 @@ void hwaddr_remove_entries(__be32 local)
 			hash_del_rcu(&entry->h_node);
 			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
 		}
+	}
+	spin_unlock(&hwaddr_hash_table_lock);
+}
+
+
+void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
+	struct hlist_node *list = NULL;
+	int index = 0;
+
+	spin_lock(&hwaddr_hash_table_lock);
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
+				h_node)
+	{
+		unsigned long const inactive = get_seconds() -
+			(unsigned long)atomic_long_read(&entry->h_stamp);
+
+		if (inactive < timeout1)
+			continue;
+
+		if ((entry->h_flags & HW_PERSIST) && inactive < timeout2)
+			continue;
+
+		hash_del_rcu(&entry->h_node);
+		call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
 	}
 	spin_unlock(&hwaddr_hash_table_lock);
 }

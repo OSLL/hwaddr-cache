@@ -28,7 +28,7 @@ struct hwaddr_entry
 	#define h_node		common.h_node
 
 	#define h_stamp		common.h_stamp
-	#define h_flag		common.h_flag
+	#define h_flags		common.h_flags
 	#define h_lock		common.h_lock
 	#define h_ha_len	common.h_ha_len
 	#define h_ha		common.h_ha
