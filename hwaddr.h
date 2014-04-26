@@ -15,7 +15,7 @@ struct hwaddr_common
 	u8			h_flags;
 	rwlock_t		h_lock;	
 	unsigned		h_ha_len;
-	u8			h_ha[ALIGN(MAX_ADDR_LEN, sizeof(unsigned long))];
+	u8			h_ha[ALIGN(MAX_ADDR_LEN, sizeof(long))];
 };
 
 struct hwaddr_entry
