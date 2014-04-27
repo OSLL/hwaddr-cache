@@ -6,6 +6,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/version.h>
 
+#include <net/addrconf.h>
 #include <net/arp.h>
 #include <net/neighbour.h>
 #include <net/route.h>
@@ -14,9 +15,9 @@
 #include "hwaddr.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
-static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
+static unsigned int hwaddr_v4_in_hook_fn(unsigned hooknum,
 #else
-static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
+static unsigned int hwaddr_v4_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
 			struct net_device const *out,
@@ -40,6 +41,36 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
 		hwaddr_v4_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+					ETH_ALEN);
+
+	return NF_ACCEPT;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
+static unsigned int hwaddr_v6_in_hook_fn(unsigned hooknum,
+#else
+static unsigned int hwaddr_v6_in_hook_fn(struct nf_hook_ops const *ops,
+#endif
+			struct sk_buff *skb, struct net_device const *in,
+			struct net_device const *out,
+			int (*okfn)(struct sk_buff *))
+{
+	struct ethhdr *lhdr = NULL;
+	struct ipv6hdr *nhdr = NULL;
+
+	if (!in)
+		return NF_ACCEPT;
+
+	if (in->type != ARPHRD_ETHER && in->type != ARPHRD_IEEE802)
+		return NF_ACCEPT;
+
+	if (skb->mac_len != ETH_HLEN)
+		return NF_ACCEPT;
+
+	lhdr = eth_hdr(skb);
+	nhdr = ipv6_hdr(skb);
+	if (ipv6_chk_addr(dev_net(in), &nhdr->daddr, in, 0))
+		hwaddr_v6_update(&nhdr->saddr, &nhdr->daddr, lhdr->h_source,
 					ETH_ALEN);
 
 	return NF_ACCEPT;
@@ -100,9 +131,9 @@ static struct rtable *hwaddr_update_route(struct sk_buff *skb,
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
-static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
+static unsigned int hwaddr_v4_out_hook_fn(unsigned hooknum,
 #else
-static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
+static unsigned int hwaddr_v4_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
 			struct net_device const *out,
@@ -137,16 +168,24 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 }
 
 
-static struct nf_hook_ops hwaddr_in_hook = {
-	.hook = hwaddr_in_hook_fn,
+static struct nf_hook_ops hwaddr_v4_in_hook = {
+	.hook = hwaddr_v4_in_hook_fn,
 	.owner = THIS_MODULE,
 	.pf = NFPROTO_IPV4,
 	.hooknum = NF_INET_LOCAL_IN,
 	.priority = NF_IP_PRI_LAST
 };
 
-static struct nf_hook_ops hwaddr_out_hook = {
-	.hook = hwaddr_out_hook_fn,
+static struct nf_hook_ops hwaddr_v6_in_hook = {
+	.hook = hwaddr_v6_in_hook_fn,
+	.owner = THIS_MODULE,
+	.pf = NFPROTO_IPV6,
+	.hooknum = NF_INET_LOCAL_IN,
+	.priority = NF_IP_PRI_LAST
+};
+
+static struct nf_hook_ops hwaddr_v4_out_hook = {
+	.hook = hwaddr_v4_out_hook_fn,
 	.owner = THIS_MODULE,
 	.pf = NFPROTO_IPV4,
 	.hooknum = NF_INET_LOCAL_OUT,
@@ -156,19 +195,31 @@ static struct nf_hook_ops hwaddr_out_hook = {
 
 int hwaddr_register_hooks(void)
 {
-	int rc = nf_register_hook(&hwaddr_in_hook);
+	int rc = nf_register_hook(&hwaddr_v4_in_hook);
 	if (rc)
 		return rc;
 
-	rc = nf_register_hook(&hwaddr_out_hook);
+	rc = nf_register_hook(&hwaddr_v6_in_hook);
 	if (rc)
-		nf_unregister_hook(&hwaddr_in_hook);
+	{
+		nf_unregister_hook(&hwaddr_v4_in_hook);
+		return rc;
+	}
+
+	rc = nf_register_hook(&hwaddr_v4_out_hook);
+	if (rc)
+	{
+		nf_unregister_hook(&hwaddr_v6_in_hook);
+		nf_unregister_hook(&hwaddr_v4_in_hook);
+		return rc;
+	}
 
 	return rc;
 }
 
 void hwaddr_unregister_hooks(void)
 {
-	nf_unregister_hook(&hwaddr_out_hook);
-	nf_unregister_hook(&hwaddr_in_hook);
+	nf_unregister_hook(&hwaddr_v4_out_hook);
+	nf_unregister_hook(&hwaddr_v6_in_hook);
+	nf_unregister_hook(&hwaddr_v4_in_hook);
 }
