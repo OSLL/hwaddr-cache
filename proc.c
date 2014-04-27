@@ -5,21 +5,47 @@
 #include "hwaddr.h"
 #include "proc.h"
 
+struct dir_list_node {
+  struct dir_list_node* next;
+  struct proc_dir_entry* dir_entry;
+  struct in_ifaddr const* ifa;
+};
+
+static struct dir_list_node *dir_list_head = NULL;
 static struct proc_dir_entry *proc_info_root = NULL;
 static char const proc_info_root_name[] = "hwaddr";
 
 static void port_folder_create(struct in_ifaddr const* const ifa) {
 	char buff[17];
-	struct proc_dir_entry* result;
+	struct dir_list_node *dir_current = NULL;
+	struct dir_list_node *dir_last = NULL;
+	
 	sprintf(buff,"%pI4", &ifa->ifa_local);
-	result = proc_mkdir(buff, proc_info_root);
-	//ToDo: write "result" into hashtable?
+	dir_current = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
+	dir_current->next = NULL;
+	dir_current->dir_entry = proc_mkdir(buff, proc_info_root);
+	dir_current->ifa = ifa;
+	dir_last = dir_list_head;
+	while (dir_last->next!=NULL) {
+		dir_last = dir_last->next;
+	}
+	dir_last->next = dir_current;
 }
 
 static void port_folder_remove(struct in_ifaddr const* const ifa) {
 	char buff[17];
+	struct dir_list_node *dir_current = NULL;
+	
 	sprintf(buff,"%pI4", &ifa->ifa_local);
 	remove_proc_entry(buff, proc_info_root);
+	
+	dir_current = dir_list_head;
+	while (dir_current->next!=NULL) {
+		dir_current = dir_current->next;
+		if (dir_current->ifa==ifa) {
+			pr_debug("FOUND!\n");
+		}
+	}
 }
 
 static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
@@ -123,13 +149,18 @@ static struct file_operations const hwaddr_proc_ops = {
 
 int hwaddr_proc_create(void)
 {
+	dir_list_head = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
+	dir_list_head->next = NULL;
+	dir_list_head->dir_entry = NULL;
+	dir_list_head->ifa = NULL;
+	
 	proc_info_root = proc_mkdir(proc_info_root_name, NULL);
 	if (!proc_info_root)
 		return -ENOMEM;
 
 	proc_create_data("cache", 0, proc_info_root, &hwaddr_proc_ops, NULL);
 	hwaddr_register_notifiers();
-
+	
 	return 0;
 }
 
@@ -139,4 +170,6 @@ void hwaddr_proc_destroy(void)
 	remove_proc_entry("cache", proc_info_root);
 	remove_proc_entry(proc_info_root_name, NULL);
 	proc_info_root = NULL;
+	kfree(dir_list_head);
+	dir_list_head = NULL;
 }
