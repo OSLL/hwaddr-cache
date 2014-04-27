@@ -206,8 +206,6 @@ static void hwaddr_entry_free_callback(struct rcu_head *head)
 
 void hwaddr_v4_remove_entries(__be32 local)
 {
-	__be32 const ANY = htonl(INADDR_ANY);
-
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *tmp = NULL;
 	struct hlist_node *list = NULL;
@@ -217,11 +215,50 @@ void hwaddr_v4_remove_entries(__be32 local)
 	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
 				h_node)
 	{
-		if ((local == ANY) || (entry->h_local_ipv4 == local))
+		if ((entry->h_proto == HW_IPv4) && (entry->h_local_ipv4 == local))
 		{
 			hash_del_rcu(&entry->h_node);
 			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
 		}
+	}
+	spin_unlock(&hwaddr_hash_table_lock);
+}
+
+
+void hwaddr_v6_remote_entries(struct in6_addr const *local)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
+	struct hlist_node *list = NULL;
+	int index = 0;
+
+	spin_lock(&hwaddr_hash_table_lock);
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
+				h_node)
+	{
+		if ((entry->h_proto == HW_IPv6) && !memcmp(&entry->h_local_ipv6, local, sizeof(*local)))
+		{
+			hash_del_rcu(&entry->h_node);
+			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
+		}
+	}
+	spin_unlock(&hwaddr_hash_table_lock);
+}
+
+
+void hwaddr_remove_entries(void)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
+	struct hlist_node *list = NULL;
+	int index = 0;
+
+	spin_lock(&hwaddr_hash_table_lock);
+	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
+				h_node)
+	{
+		hash_del_rcu(&entry->h_node);
+		call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
 	}
 	spin_unlock(&hwaddr_hash_table_lock);
 }
@@ -252,6 +289,7 @@ void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2)
 	}
 	spin_unlock(&hwaddr_hash_table_lock);
 }
+
 
 void hwaddr_foreach(hwaddr_callback_t cb, void *data)
 {

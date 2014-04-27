@@ -18,6 +18,10 @@ struct hwaddr_entry *hwaddr_v6_lookup(struct in6_addr const *remote,
 			struct in6_addr const *local);
 
 void hwaddr_v4_remove_entries(__be32 local);
+void hwaddr_v6_remote_entries(struct in6_addr const *local);
+void hwaddr_remove_entries(void);
+
+
 void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2);
 void hwaddr_foreach(hwaddr_callback_t cb, void *data);
 
