@@ -8,7 +8,7 @@ static struct kmem_cache *hwaddr_cache;
 
 void hwaddr_slab_destroy(void)
 {
-	hwaddr_remove_entries();
+	hwaddr_v4_remove_entries(htonl(INADDR_ANY));
 	rcu_barrier();
 	kmem_cache_destroy(hwaddr_cache);
 }
