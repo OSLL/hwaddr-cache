@@ -10,7 +10,6 @@
 #include <net/arp.h>
 #include <net/neighbour.h>
 #include <net/route.h>
-#include <net/ip6_route.h>
 
 #include "hash.h"
 #include "hwaddr.h"
@@ -77,19 +76,20 @@ static unsigned int hwaddr_v6_in_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-static struct neighbour *hwaddr_v4_neighbour(struct dst_entry *dst,
+static struct neighbour *hwaddr_neighbour(struct rtable *rt,
 			struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
-	struct neighbour *neigh = dst->neighbour;
+	struct neighbour *neigh = rt->dst.neighbour;
 #else
 	struct neighbour *neigh = NULL;
-	__be32 next = entry->h_remote_ipv4;
+	__be32 next = 0;
 
 	rcu_read_lock_bh();
-	neigh = __ipv4_neigh_lookup_noref(dst->dev, next);
+	next = rt_nexthop(rt, entry->h_remote_ipv4);
+	neigh = __ipv4_neigh_lookup_noref(rt->dst.dev, next);
 	if (IS_ERR_OR_NULL(neigh))
-		neigh = __neigh_create(&arp_tbl, &next, dst->dev, false);
+		neigh = __neigh_create(&arp_tbl, &next, rt->dst.dev, false);
 	rcu_read_unlock_bh();
 #endif
 
@@ -99,40 +99,16 @@ static struct neighbour *hwaddr_v4_neighbour(struct dst_entry *dst,
 	return neigh;
 }
 
-static struct neighbour *hwaddr_v6_neighbour(struct dst_entry *dst,
-			struct hwaddr_entry *entry)
+static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
-	struct neighbour *neigh = dst->neighbour;
-#else
-	struct neighbour *neigh = NULL;
-	struct in6_addr *next = &entry->h_remote_ipv6;
-
-	rcu_read_lock_bh();
-	neigh = __ipv6_neigh_lookup_noref(dst->dev, next);
-	if (IS_ERR_OR_NULL(neigh))
-		neigh = __neigh_create(&nd_tbl, next, dst->dev, false);
-	rcu_read_unlock_bh();
-#endif
-
-	if (IS_ERR(neigh))
-		return NULL;
-
-	return neigh;
-}
-
-static void hwaddr_ensure_neigh(struct dst_entry *dst, struct hwaddr_entry *entry)
-{
-	struct neighbour *const neigh = (entry->h_proto == HW_IPv4)
-				? hwaddr_v4_neighbour(dst, entry)
-				: hwaddr_v6_neighbour(dst, entry);
+	struct neighbour *const neigh = hwaddr_neighbour(rt, entry);
 
 	read_lock(&entry->h_lock);
 	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
 	read_unlock(&entry->h_lock);
 }
 
-static struct rtable *hwaddr_v4_update_route(struct sk_buff *skb,
+static struct rtable *hwaddr_update_route(struct sk_buff *skb,
 			struct net_device const *out,
 			struct hwaddr_entry *entry)
 {
@@ -146,37 +122,12 @@ static struct rtable *hwaddr_v4_update_route(struct sk_buff *skb,
 		dst_hold(&rt->dst);
 		skb_dst_drop(skb);
 		skb_dst_set(skb, &rt->dst);
-		hwaddr_ensure_neigh(&rt->dst, entry);
+		hwaddr_ensure_neigh(rt, entry);
 		if (skb->sk)
 			sk_setup_caps(skb->sk, &rt->dst);
 	}
 
 	return rt;
-}
-
-static struct dst_entry *hwaddr_v6_update_route(struct sk_buff *skb,
-			struct net_device const *out,
-			struct hwaddr_entry *entry)
-{
-	struct dst_entry *dst = NULL;
-	struct flowi6 fl;
-
-	fl.flowi6_oif = out->ifindex;
-	memcpy(&fl.daddr, &entry->h_remote_ipv6,
-				sizeof(entry->h_remote_ipv6));
-	memcpy(&fl.saddr, &entry->h_local_ipv6,
-				sizeof(entry->h_local_ipv6));
-	dst = ip6_route_output(dev_net(out), NULL, &fl);
-
-	if (!IS_ERR(dst))
-	{
-		dst_hold(dst);
-		skb_dst_drop(skb);
-		skb_dst_set(skb, dst);
-		hwaddr_ensure_neigh(dst, entry);
-	}
-
-	return dst;
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
@@ -204,7 +155,7 @@ static unsigned int hwaddr_v4_out_hook_fn(struct nf_hook_ops const *ops,
 	entry = hwaddr_v4_lookup(nhdr->daddr, nhdr->saddr);
 	if (entry)
 	{
-		rt = hwaddr_v4_update_route(skb, target, entry);
+		rt = hwaddr_update_route(skb, target, entry);
 		if (IS_ERR(rt))
 			pr_warn("cannot reroute packet to %pI4\n",
 						&nhdr->daddr);
@@ -216,35 +167,6 @@ static unsigned int hwaddr_v4_out_hook_fn(struct nf_hook_ops const *ops,
 	return NF_ACCEPT;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
-static unsigned int hwaddr_v6_out_hook_fn(unsigned hooknum,
-#else
-static unsigned int hwaddr_v6_out_hook_fn(struct nf_hook_ops const *ops,
-#endif
-			struct sk_buff *skb, struct net_device const *in,
-			struct net_device const *out,
-			int (*okfn)(struct sk_buff *))
-{
-	struct hwaddr_entry *entry = NULL;
-	struct dst_entry *dst = NULL;
-	struct ipv6hdr const *const nhdr = ipv6_hdr(skb);
-
-	if (!out)
-		return NF_ACCEPT;
-
-	rcu_read_lock();
-	entry = hwaddr_v6_lookup(&nhdr->daddr, &nhdr->saddr);
-	if (entry)
-	{
-		dst = hwaddr_v6_update_route(skb, out, entry);
-		if (IS_ERR(dst))
-			pr_warn("cannot reroute packet to %pI6\n",
-						&nhdr->daddr);
-	}
-	rcu_read_unlock();
-
-	return NF_ACCEPT;
-}
 
 static struct nf_hook_ops hwaddr_v4_in_hook = {
 	.hook = hwaddr_v4_in_hook_fn,
@@ -270,13 +192,6 @@ static struct nf_hook_ops hwaddr_v4_out_hook = {
 	.priority = NF_IP_PRI_LAST
 };
 
-static struct nf_hook_ops hwaddr_v6_out_hook = {
-	.hook = hwaddr_v6_out_hook_fn,
-	.owner = THIS_MODULE,
-	.pf = NFPROTO_IPV4,
-	.hooknum = NF_INET_LOCAL_OUT,
-	.priority = NF_IP_PRI_LAST
-};
 
 int hwaddr_register_hooks(void)
 {
@@ -291,20 +206,12 @@ int hwaddr_register_hooks(void)
 		return rc;
 	}
 
-	rc = nf_register_hook(&hwaddr_v6_out_hook);
+	rc = nf_register_hook(&hwaddr_v4_out_hook);
 	if (rc)
 	{
 		nf_unregister_hook(&hwaddr_v6_in_hook);
 		nf_unregister_hook(&hwaddr_v4_in_hook);
 		return rc;
-	}
-
-	rc = nf_register_hook(&hwaddr_v4_out_hook);
-	if (rc)
-	{
-		nf_unregister_hook(&hwaddr_v6_out_hook);
-		nf_unregister_hook(&hwaddr_v6_in_hook);
-		nf_unregister_hook(&hwaddr_v4_in_hook);
 	}
 
 	return rc;
@@ -313,7 +220,6 @@ int hwaddr_register_hooks(void)
 void hwaddr_unregister_hooks(void)
 {
 	nf_unregister_hook(&hwaddr_v4_out_hook);
-	nf_unregister_hook(&hwaddr_v6_out_hook);
 	nf_unregister_hook(&hwaddr_v6_in_hook);
 	nf_unregister_hook(&hwaddr_v4_in_hook);
 }
