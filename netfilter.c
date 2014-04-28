@@ -69,7 +69,7 @@ static unsigned int hwaddr_v6_in_hook_fn(struct nf_hook_ops const *ops,
 
 	lhdr = eth_hdr(skb);
 	nhdr = ipv6_hdr(skb);
-	if (ipv6_chk_addr(dev_net(in), &nhdr->daddr, (struct net_device *)in, 0))
+	if (ipv6_chk_addr(dev_net(in), &nhdr->daddr, in, 0))
 		hwaddr_v6_update(&nhdr->saddr, &nhdr->daddr, lhdr->h_source,
 					ETH_ALEN);
 

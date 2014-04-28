@@ -92,7 +92,7 @@ static struct hwaddr_entry *hwaddr_v6_create_slow(struct in6_addr const *remote,
 	entry = hwaddr_v6_alloc(remote, local, ha, ha_len);
 	if (entry)
 		hash_add_rcu(hwaddr_hash_table, &entry->h_node,
-					hwaddr_hash((u8 const *)remote,
+					hwaddr_hash((u8 const *)&remote,
 						sizeof(*remote)));
 	spin_unlock(&hwaddr_hash_table_lock);
 

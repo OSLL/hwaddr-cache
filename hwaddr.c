@@ -87,8 +87,8 @@ struct hwaddr_entry *hwaddr_v6_alloc(struct in6_addr const *remote,
 		return NULL;
 
 	entry->h_proto = HW_IPv6;
-	memcpy(&entry->h_remote_ipv6, remote, sizeof(*remote));
-	memcpy(&entry->h_local_ipv6, local, sizeof(*local));
+	entry->h_remote_ipv6 = *remote;
+	entry->h_local_ipv6 = *local;
 
 	return entry;
 }
