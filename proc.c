@@ -37,8 +37,10 @@ static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
 
 static int hwaddr_ifa_cache_open(struct inode *inode, struct file *file)
 {
-        struct dir_list_node *dir_current = NULL;
-        dir_current = dir_list_head;
+        struct dir_list_node *node = NULL;
+	struct proc_dir_entry *dir = NULL;
+	//proc_dir_entry = PDR(inode);
+        dir_current = PDE(dir_list_head;
         while (dir_current->next!=NULL) {
                 dir_current = dir_current->next;
                 if (strcmp(file->f_path.dentry->d_parent->d_iname, dir_current->ipname)==0) {
@@ -56,7 +58,7 @@ static struct file_operations const hwaddr_ifa_cache_ops = {
         .release = single_release,
 };
 
-static void port_folder_create(struct in_ifaddr const* const ifa) {
+static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
         struct dir_list_node *dir_current = NULL;
         struct dir_list_node *dir_last = NULL;
 
@@ -76,7 +78,7 @@ static void port_folder_create(struct in_ifaddr const* const ifa) {
         pr_debug("Adding entry %s\n", dir_current->ipname);
 }
 
-static void port_folder_remove(struct in_ifaddr const* const ifa) {
+static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
         char buff[17];
         struct dir_list_node *dir_current = NULL;
         struct dir_list_node *dir_prev = NULL;
@@ -105,10 +107,10 @@ static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
         switch (event)
         {
         case NETDEV_UP:
-                port_folder_create(ifa);
+                hwaddr_ifa_folder_create(ifa);
                 break;
         case NETDEV_DOWN:
-                port_folder_remove(ifa);
+                hwaddr_ifa_folder_remove(ifa);
                 break;
         }
         return NOTIFY_DONE;
@@ -136,12 +138,12 @@ static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
         {
         case NETDEV_UP:
                 for_ifa(in_dev) {
-                        port_folder_create(ifa);
+                        hwaddr_ifa_folder_create(ifa);
                 } endfor_ifa(in_dev);
                 break;
         case NETDEV_DOWN:
                 for_ifa(in_dev) {
-                        port_folder_remove(ifa);
+                        hwaddr_ifa_folder_remove(ifa);
                 } endfor_ifa(in_dev);
                 break;
         }
