@@ -99,8 +99,8 @@ static int hwaddr_proc_open(struct inode *inode, struct file *file)
 
 struct hwaddr_ref_request
 {
-	__be32	remote;
-	__be32	local;
+	struct in_addr	remote;
+	struct in_addr	local;
 };
 
 #define HWADDR_IOC_MAGIC	0xFE
@@ -124,7 +124,7 @@ static long hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
 		return -EINVAL;
 	}
 
-	entry = hwaddr_lookup(request.remote, request.local);
+	entry = hwaddr_lookup(request.remote.s_addr, request.local.s_addr);
 	if (!entry)
 	{
 		pr_warn("hwaddr-cache cannot find such entry\n");
