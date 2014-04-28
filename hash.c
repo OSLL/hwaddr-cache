@@ -127,7 +127,7 @@ void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2)
 		if (inactive < timeout1)
 			continue;
 
-		if ((entry->h_flags & HW_PERSIST) && inactive < timeout2)
+		if ((atomic_read(&entry->h_refcnt) > 0) && inactive < timeout2)
 			continue;
 
 		hash_del_rcu(&entry->h_node);

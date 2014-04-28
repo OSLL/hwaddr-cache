@@ -97,11 +97,62 @@ static int hwaddr_proc_open(struct inode *inode, struct file *file)
 	return single_open(file, hwaddr_show_cache, NULL);
 }
 
+struct hwaddr_ref_request
+{
+	__be32	remote;
+	__be32	local;
+};
+
+#define HWADDR_IOC_MAGIC	0xFE
+#define HWADDR_ENTRY_REF	_IOW(HWADDR_IOC_MAGIC, 1, struct hwaddr_ref_request)
+#define HWADDR_ENTRY_UNREF	_IOW(HWADDR_IOC_MAGIC, 2, struct hwaddr_ref_request)
+
+static int hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hwaddr_ref_request request;
+
+	if (_IOC_TYPE(cmd) != HWADDR_IOC_MAGIC)
+	{
+		pr_warn("hwaddr-cache do not know this ioctl\n");
+		return -EINVAL;
+	}
+
+	if (copy_from_user(&request, (void const *)arg, sizeof(request)))
+	{
+		pr_warn("hwaddr-cache cannot copy data\n");
+		return -EINVAL;
+	}
+
+	entry = hwaddr_lookup(request.remote, request.local);
+	if (!entry)
+	{
+		pr_warn("hwaddr-cache cannot find such entry\n");
+		return -EINVAL;
+	}
+
+	switch (cmd)
+	{
+	case HWADDR_ENTRY_REF:
+		atomic_inc(&entry->h_refcnt);
+		break;
+	case HWADDR_ENTRY_UNREF:
+		if (atomic_dec_return(&entry->h_refcnt) < 0)
+			pr_warn("hwaddr-cache decremented zero\n");
+		break;
+	default:
+		pr_warn("hwaddr-cache do not support this ioctl\n");
+		return 1;
+	}
+	return 0;
+}
+
 static struct file_operations const hwaddr_proc_ops = {
 	.open = hwaddr_proc_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
+	.unlocked_ioctl = hwaddr_ioctl,
 };
 
 int hwaddr_proc_create(void)
