@@ -107,7 +107,7 @@ struct hwaddr_ref_request
 #define HWADDR_ENTRY_REF	_IOW(HWADDR_IOC_MAGIC, 1, struct hwaddr_ref_request)
 #define HWADDR_ENTRY_UNREF	_IOW(HWADDR_IOC_MAGIC, 2, struct hwaddr_ref_request)
 
-static int hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
+static long hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hwaddr_ref_request request;
