@@ -2,18 +2,11 @@
 #define __HWADDR_CACHE_HWADDR_H__
 
 #include <linux/inetdevice.h>
-#include <linux/ipv6.h>
 #include <linux/kernel.h>
 #include <linux/rwlock.h>
 #include <linux/string.h>
 
 #define HW_PERSIST	0x01
-
-enum hwaddr_proto
-{
-	HW_IPv4,
-	HW_IPv6
-};
 
 struct hwaddr_common
 {
@@ -30,7 +23,6 @@ struct hwaddr_common
 struct hwaddr_entry
 {
 	struct hwaddr_common	common;
-	enum hwaddr_proto	h_proto;
 
 	#define h_rcu		common.h_rcu
 	#define h_node		common.h_node
@@ -41,17 +33,8 @@ struct hwaddr_entry
 	#define h_ha_len	common.h_ha_len
 	#define h_ha		common.h_ha
 
-	union
-	{
-		__be32			h_local_ipv4;
-		struct in6_addr		h_local_ipv6;
-	};
-
-	union
-	{
-		__be32			h_remote_ipv4;
-		struct in6_addr		h_remote_ipv6;
-	};
+	__be32			h_local;
+	__be32			h_remote;
 };
 
 static inline void init_hwaddr_entry(struct hwaddr_entry *entry, u8 const *ha,
@@ -65,10 +48,7 @@ void hwaddr_slab_destroy(void);
 int hwaddr_slab_create(void);
 
 void hwaddr_free(struct hwaddr_entry *entry);
-struct hwaddr_entry *hwaddr_v4_alloc(__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len);
-struct hwaddr_entry *hwaddr_v6_alloc(struct in6_addr const *remote,
-			struct in6_addr const *local, u8 const *ha,
+struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
 			unsigned ha_len);
 
 #endif /*__HWADDR_CACHE_HWADDR_H__*/

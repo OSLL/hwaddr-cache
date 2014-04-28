@@ -80,16 +80,8 @@ static void hwaddr_show_entry(struct hwaddr_entry *entry, void *data)
 	struct seq_file *sf = (struct seq_file *)data;
 
 	read_lock(&entry->h_lock);
-
-	if (entry->h_proto == HW_IPv4)
-		seq_printf(sf, "local ip = %pI4, remote ip = %pI4, "
-					"hwaddr = %pM\n", &entry->h_local_ipv4,
-					&entry->h_remote_ipv4, entry->h_ha);
-	else
-		seq_printf(sf, "local ip = %pI6, remote ip = %pI6, "
-					"hwaddr = %pM\n", &entry->h_local_ipv6,
-					&entry->h_remote_ipv6, entry->h_ha);
-
+	seq_printf(sf, "local ip = %pI4, remote ip = %pI4, hwaddr = %pM\n",
+				&entry->h_local, &entry->h_remote, entry->h_ha);
 	read_unlock(&entry->h_lock);
 }
 

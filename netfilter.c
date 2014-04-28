@@ -39,7 +39,7 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_v4_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
 					ETH_ALEN);
 
 	return NF_ACCEPT;
@@ -55,7 +55,7 @@ static struct neighbour *hwaddr_neighbour(struct rtable *rt,
 	__be32 next = 0;
 
 	rcu_read_lock_bh();
-	next = rt_nexthop(rt, entry->h_remote_ipv4);
+	next = rt_nexthop(rt, entry->h_remote);
 	neigh = __ipv4_neigh_lookup_noref(rt->dst.dev, next);
 	if (IS_ERR_OR_NULL(neigh))
 		neigh = __neigh_create(&arp_tbl, &next, rt->dst.dev, false);
@@ -121,7 +121,7 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	rcu_read_lock();
-	entry = hwaddr_v4_lookup(nhdr->daddr, nhdr->saddr);
+	entry = hwaddr_lookup(nhdr->daddr, nhdr->saddr);
 	if (entry)
 	{
 		rt = hwaddr_update_route(skb, target, entry);
