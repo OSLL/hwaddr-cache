@@ -19,7 +19,8 @@ static unsigned int hwaddr_in_hook_fn(unsigned hooknum,
 static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
-			struct net_device const *out, int (*okfn)(struct sk_buff *))
+			struct net_device const *out,
+			int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct ethhdr *lhdr = NULL;
@@ -38,12 +39,14 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source, ETH_ALEN);
+		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+					ETH_ALEN);
 
 	return NF_ACCEPT;
 }
 
-static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
+static struct neighbour *hwaddr_neighbour(struct rtable *rt,
+			struct hwaddr_entry *entry)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
 	struct neighbour *neigh = rt->dst.neighbour;
@@ -52,7 +55,7 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 	__be32 next = 0;
 
 	rcu_read_lock_bh();
-	next = rt_nexthop(rt, entry->remote);
+	next = rt_nexthop(rt, entry->h_remote);
 	neigh = __ipv4_neigh_lookup_noref(rt->dst.dev, next);
 	if (IS_ERR_OR_NULL(neigh))
 		neigh = __neigh_create(&arp_tbl, &next, rt->dst.dev, false);
@@ -60,19 +63,28 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 #endif
 
 	if (IS_ERR(neigh))
-		return;
+		return NULL;
 
-	read_lock(&entry->lock);
-	neigh_update(neigh, entry->ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
-	read_unlock(&entry->lock);
+	return neigh;
+}
+
+static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
+{
+	struct neighbour *const neigh = hwaddr_neighbour(rt, entry);
+
+	read_lock(&entry->h_lock);
+	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
+	read_unlock(&entry->h_lock);
 }
 
 static struct rtable *hwaddr_update_route(struct sk_buff *skb,
-			struct net_device const *out, struct hwaddr_entry *entry)
+			struct net_device const *out,
+			struct hwaddr_entry *entry)
 {
 	struct iphdr const *const nhdr = ip_hdr(skb);
 	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
-				nhdr->saddr, nhdr->tos | RTO_ONLINK, out->ifindex);
+				nhdr->saddr, nhdr->tos | RTO_ONLINK,
+				out->ifindex);
 
 	if (!IS_ERR(rt))
 	{
@@ -93,7 +105,8 @@ static unsigned int hwaddr_out_hook_fn(unsigned hooknum,
 static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 #endif
 			struct sk_buff *skb, struct net_device const *in,
-			struct net_device const *out, int (*okfn)(struct sk_buff *))
+			struct net_device const *out,
+			int (*okfn)(struct sk_buff *))
 {
 	struct net_device *target = NULL;
 	struct hwaddr_entry *entry = NULL;
@@ -108,12 +121,13 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	rcu_read_lock();
-	entry = hwaddr_lookup(nhdr->daddr);
+	entry = hwaddr_lookup(nhdr->daddr, nhdr->saddr);
 	if (entry)
 	{
 		rt = hwaddr_update_route(skb, target, entry);
 		if (IS_ERR(rt))
-			pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
+			pr_warn("cannot reroute packet to %pI4\n",
+						&nhdr->daddr);
 	}
 	rcu_read_unlock();
 

@@ -18,12 +18,16 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 {
         struct seq_file *sf = (struct seq_file *)data;
         struct dir_list_node *node = (struct dir_list_node *)sf->private;
+	unsigned long const inactive = get_seconds() -
+			(unsigned long)atomic_long_read(&entry->h_stamp);
+	int const refs = atomic_read(&entry->h_refcnt);
 
-        read_lock(&entry->lock);
-        if (node->ifa->ifa_local!=entry->local) return;
-        seq_printf(sf, "local ip = %pI4, remote ip = %pI4, hwaddr = %pM\n",
-                                &entry->local, &entry->remote, entry->ha);
-        read_unlock(&entry->lock);
+        if (node->ifa->ifa_local!=entry->h_local) return;
+
+	read_lock(&entry->h_lock);
+	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
+				&entry->h_remote, entry->h_ha, refs, inactive);
+	read_unlock(&entry->h_lock);
 }
 
 static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
@@ -85,8 +89,8 @@ static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
         remove_proc_entry(buff, proc_info_root);
 }
 
-static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
-                        void *ptr)
+static int hwaddr_inetaddr_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
 {
         struct in_ifaddr const* const ifa = (struct in_ifaddr *)ptr;
         switch (event)
@@ -101,12 +105,12 @@ static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
         return NOTIFY_DONE;
 }
 
-static struct notifier_block aufs_inetaddr_notifier = {
-        .notifier_call = aufs_inetaddr_event,
+static struct notifier_block hwaddr_inetaddr_notifier = {
+	.notifier_call = hwaddr_inetaddr_event,
 };
 
-static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
-                        void *ptr)
+static int hwaddr_netdev_event(struct notifier_block *nb, unsigned long event,
+			void *ptr)
 {
         struct net_device const* const dev =
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
@@ -135,35 +139,40 @@ static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
         return NOTIFY_DONE;
 }
 
-static struct notifier_block aufs_netdev_notifier = {
-        .notifier_call = aufs_netdev_event,
+static struct notifier_block hwaddr_netdev_notifier = {
+	.notifier_call = hwaddr_netdev_event,
 };
 
 static void hwaddr_register_notifiers(void)
 {
-        register_netdevice_notifier(&aufs_netdev_notifier);
-        register_inetaddr_notifier(&aufs_inetaddr_notifier);
+	register_netdevice_notifier(&hwaddr_netdev_notifier);
+	register_inetaddr_notifier(&hwaddr_inetaddr_notifier);
 }
 
 static void hwaddr_unregister_notifiers(void)
 {
-        unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
-        unregister_netdevice_notifier(&aufs_netdev_notifier);
+	unregister_inetaddr_notifier(&hwaddr_inetaddr_notifier);
+	unregister_netdevice_notifier(&hwaddr_netdev_notifier);
 }
 
 static void hwaddr_show_entry(struct hwaddr_entry *entry, void *data)
 {
-        struct seq_file *sf = (struct seq_file *)data;
+	struct seq_file *sf = (struct seq_file *)data;
+	unsigned long const inactive = get_seconds() -
+			(unsigned long)atomic_long_read(&entry->h_stamp);
+	int const refs = atomic_read(&entry->h_refcnt);
 
-        read_lock(&entry->lock);
-        seq_printf(sf, "local ip = %pI4, remote ip = %pI4, hwaddr = %pM\n",
-                                &entry->local, &entry->remote, entry->ha);
-        read_unlock(&entry->lock);
+	read_lock(&entry->h_lock);
+	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
+				&entry->h_remote, entry->h_ha, refs, inactive);
+	read_unlock(&entry->h_lock);
 }
 
 static int hwaddr_show_cache(struct seq_file *sf, void *unused)
 {
-        hwaddr_foreach(hwaddr_show_entry, sf);
+	seq_printf(sf, "%15s  %15s  %17s  %5s  %10s\n", "local ip", "remote ip",
+				"mac address", "refcnt", "inactive");
+	hwaddr_foreach(hwaddr_show_entry, sf);
 
         return 0;
 }
@@ -173,11 +182,62 @@ static int hwaddr_proc_open(struct inode *inode, struct file *file)
         return single_open(file, hwaddr_show_cache, NULL);
 }
 
+struct hwaddr_ref_request
+{
+	struct in_addr	remote;
+	struct in_addr	local;
+};
+
+#define HWADDR_IOC_MAGIC	0xFE
+#define HWADDR_ENTRY_REF	_IOW(HWADDR_IOC_MAGIC, 1, struct hwaddr_ref_request)
+#define HWADDR_ENTRY_UNREF	_IOW(HWADDR_IOC_MAGIC, 2, struct hwaddr_ref_request)
+
+static long hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hwaddr_ref_request request;
+
+	if (_IOC_TYPE(cmd) != HWADDR_IOC_MAGIC)
+	{
+		pr_warn("hwaddr-cache do not know this ioctl\n");
+		return -EINVAL;
+	}
+
+	if (copy_from_user(&request, (void const *)arg, sizeof(request)))
+	{
+		pr_warn("hwaddr-cache cannot copy data\n");
+		return -EINVAL;
+	}
+
+	entry = hwaddr_lookup(request.remote.s_addr, request.local.s_addr);
+	if (!entry)
+	{
+		pr_warn("hwaddr-cache cannot find such entry\n");
+		return -EINVAL;
+	}
+
+	switch (cmd)
+	{
+	case HWADDR_ENTRY_REF:
+		atomic_inc(&entry->h_refcnt);
+		break;
+	case HWADDR_ENTRY_UNREF:
+		if (atomic_dec_return(&entry->h_refcnt) < 0)
+			pr_warn("hwaddr-cache decremented zero\n");
+		break;
+	default:
+		pr_warn("hwaddr-cache do not support this ioctl\n");
+		return 1;
+	}
+	return 0;
+}
+
 static struct file_operations const hwaddr_proc_ops = {
-        .open = hwaddr_proc_open,
-        .read = seq_read,
-        .llseek = seq_lseek,
-        .release = single_release,
+	.open = hwaddr_proc_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.unlocked_ioctl = hwaddr_ioctl,
 };
 
 int hwaddr_proc_create(void)
