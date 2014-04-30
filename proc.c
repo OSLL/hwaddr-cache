@@ -5,7 +5,7 @@
 #include "hwaddr.h"
 #include "proc.h"
 
-static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
+static int hwaddr_inetaddr_event(struct notifier_block *nb, unsigned long event,
 			void *ptr)
 {
 	struct in_ifaddr const* const ifa = (struct in_ifaddr *)ptr;
@@ -21,11 +21,11 @@ static int aufs_inetaddr_event(struct notifier_block *nb, unsigned long event,
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block aufs_inetaddr_notifier = {
-	.notifier_call = aufs_inetaddr_event,
+static struct notifier_block hwaddr_inetaddr_notifier = {
+	.notifier_call = hwaddr_inetaddr_event,
 };
 
-static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
+static int hwaddr_netdev_event(struct notifier_block *nb, unsigned long event,
 			void *ptr)
 {
 	struct net_device const* const dev =
@@ -55,20 +55,20 @@ static int aufs_netdev_event(struct notifier_block *nb, unsigned long event,
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block aufs_netdev_notifier = {
-	.notifier_call = aufs_netdev_event,
+static struct notifier_block hwaddr_netdev_notifier = {
+	.notifier_call = hwaddr_netdev_event,
 };
 
 static void hwaddr_register_notifiers(void)
 {
-	register_netdevice_notifier(&aufs_netdev_notifier);
-	register_inetaddr_notifier(&aufs_inetaddr_notifier);
+	register_netdevice_notifier(&hwaddr_netdev_notifier);
+	register_inetaddr_notifier(&hwaddr_inetaddr_notifier);
 }
 
 static void hwaddr_unregister_notifiers(void)
 {
-	unregister_inetaddr_notifier(&aufs_inetaddr_notifier);
-	unregister_netdevice_notifier(&aufs_netdev_notifier);
+	unregister_inetaddr_notifier(&hwaddr_inetaddr_notifier);
+	unregister_netdevice_notifier(&hwaddr_netdev_notifier);
 }
 
 
