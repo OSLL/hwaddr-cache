@@ -1,16 +1,18 @@
 #include <linux/proc_fs.h>
 #include <linux/version.h>
+#include <linux/list.h>
 #include "hash.h"
 #include "hwaddr.h"
 #include "proc.h"
 
 struct dir_list_node {
-  struct dir_list_node* next;
   struct proc_dir_entry* dir_entry;
   struct in_ifaddr const* ifa;
+  struct list_head list;
 };
 
-static struct dir_list_node *dir_list_head = NULL;
+LIST_HEAD(dir_list);
+
 static struct proc_dir_entry *proc_info_root = NULL;
 static char const proc_info_root_name[] = "hwaddr";
 
@@ -51,40 +53,31 @@ static struct file_operations const hwaddr_ifa_cache_ops = {
 
 static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
         struct dir_list_node *node_current = NULL;
-        struct dir_list_node *node_last = NULL;
 	char buffer[17];
         sprintf(buffer,"%pI4", &ifa->ifa_local);
 	
         node_current = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
-        node_current->next = NULL;
         node_current->dir_entry = proc_mkdir(buffer, proc_info_root);
         node_current->ifa = ifa;
         proc_create_data("cache", 0, node_current->dir_entry, &hwaddr_ifa_cache_ops, NULL);
 
-        node_last = dir_list_head;
-        while (node_last->next!=NULL) {
-                node_last = node_last->next;
-        }
-        node_last->next = node_current;
+        list_add(&node_current->list, &dir_list);
 }
 
 static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
         char buff[17];
-        struct dir_list_node *node_current = NULL;
-        struct dir_list_node *node_prev = NULL;
-
-        node_current = dir_list_head;
-        while (node_current->next!=NULL) {
-                node_prev = node_current;
-                node_current = node_current->next;
-                if (node_current->ifa==ifa) {
-                        node_prev->next = node_current->next;
-                        remove_proc_entry("cache", node_current->dir_entry);
-                        kfree(node_current);
+        struct dir_list_node *node = NULL;
+	struct list_head *entry;
+	list_for_each(entry, &dir_list) {
+		node = list_entry(entry, struct dir_list_node, list);
+		if (node->ifa==ifa) {
+			list_del(entry);
+			remove_proc_entry("cache", node->dir_entry);
+                        kfree(node);
                         break;
-                }
-        }
-
+		}
+	}
+	
         sprintf(buff,"%pI4", &ifa->ifa_local);
         remove_proc_entry(buff, proc_info_root);
 }
@@ -242,11 +235,6 @@ static struct file_operations const hwaddr_proc_ops = {
 
 int hwaddr_proc_create(void)
 {
-        dir_list_head = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
-        dir_list_head->next = NULL;
-        dir_list_head->dir_entry = NULL;
-        dir_list_head->ifa = NULL;
-
         proc_info_root = proc_mkdir(proc_info_root_name, NULL);
         if (!proc_info_root)
                 return -ENOMEM;
@@ -263,6 +251,4 @@ void hwaddr_proc_destroy(void)
         remove_proc_entry("cache", proc_info_root);
         remove_proc_entry(proc_info_root_name, NULL);
         proc_info_root = NULL;
-        kfree(dir_list_head);
-        dir_list_head = NULL;
 }
