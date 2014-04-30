@@ -78,15 +78,20 @@ static char const proc_info_root_name[] = "hwaddr";
 static void hwaddr_show_entry(struct hwaddr_entry *entry, void *data)
 {
 	struct seq_file *sf = (struct seq_file *)data;
+	unsigned long const inactive = get_seconds() -
+			(unsigned long)atomic_long_read(&entry->h_stamp);
+	int const refs = atomic_read(&entry->h_refcnt);
 
 	read_lock(&entry->h_lock);
-	seq_printf(sf, "local ip = %pI4, remote ip = %pI4, hwaddr = %pM\n",
-				&entry->h_local, &entry->h_remote, entry->h_ha);
+	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
+				&entry->h_remote, entry->h_ha, refs, inactive);
 	read_unlock(&entry->h_lock);
 }
 
 static int hwaddr_show_cache(struct seq_file *sf, void *unused)
 {
+	seq_printf(sf, "%15s  %15s  %17s  %5s  %10s\n", "local ip", "remote ip",
+				"mac address", "refcnt", "inactive");
 	hwaddr_foreach(hwaddr_show_entry, sf);
 
 	return 0;
