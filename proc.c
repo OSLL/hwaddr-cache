@@ -155,10 +155,8 @@ static void hwaddr_show_entry(struct hwaddr_entry *entry, void *data)
 			(unsigned long)atomic_long_read(&entry->h_stamp);
 	int const refs = atomic_read(&entry->h_refcnt);
 
-	read_lock(&entry->h_lock);
 	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
 				&entry->h_remote, entry->h_ha, refs, inactive);
-	read_unlock(&entry->h_lock);
 }
 
 static int hwaddr_show_cache(struct seq_file *sf, void *unused)
