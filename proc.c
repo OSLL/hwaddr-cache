@@ -11,7 +11,7 @@ struct dir_list_node {
   struct list_head list;
 };
 
-LIST_HEAD(dir_list);
+static LIST_HEAD(dir_list);
 
 static struct proc_dir_entry *proc_info_root = NULL;
 static char const proc_info_root_name[] = "hwaddr";
@@ -67,8 +67,8 @@ static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
 static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
         char buff[17];
         struct dir_list_node *node = NULL;
-	struct list_head *entry;
-	list_for_each(entry, &dir_list) {
+	struct list_head *entry, *temp;
+	list_for_each_safe(entry, temp, &dir_list) {
 		node = list_entry(entry, struct dir_list_node, list);
 		if (node->ifa==ifa) {
 			list_del(entry);
