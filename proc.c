@@ -26,10 +26,8 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 
         if (node->ifa->ifa_local!=entry->h_local) return;
 
-	read_lock(&entry->h_lock);
 	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
 				&entry->h_remote, entry->h_ha, refs, inactive);
-	read_unlock(&entry->h_lock);
 }
 
 static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
