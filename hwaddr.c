@@ -1,5 +1,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <net/route.h>
 
 #include "hash.h"
 #include "hwaddr.h"
@@ -28,12 +29,25 @@ int hwaddr_slab_create(void)
 void hwaddr_free(struct hwaddr_entry *entry)
 {
 	pr_debug("freeing entry for %pI4\n", &entry->h_remote);
-			
+
+	dst_release(&entry->h_route->dst);
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len)
+static struct rtable* hwaddr_create_route(struct net_device const *dev,
+			__be32 remote, __be32 local)
+{
+	struct rtable *rt = ip_route_output(dev_net(dev), remote, local,
+				RTO_ONLINK, dev->ifindex);
+
+	if (!IS_ERR_OR_NULL(rt))
+		return rt;
+
+	return NULL;
+}
+
+struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
+			__be32 local, u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -50,6 +64,13 @@ struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
 	init_hwaddr_entry(entry, ha, ha_len);
 	entry->h_remote = remote;
 	entry->h_local = local;
+	entry->h_route = hwaddr_create_route(dev, remote, local);
+	if (!entry->h_route)
+	{
+		pr_warn("cannot create route for %pI4\n", &remote);
+		kmem_cache_free(hwaddr_cache, entry);
+		return NULL;
+	}
 
 	return entry;
 }

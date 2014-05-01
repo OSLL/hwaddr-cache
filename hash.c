@@ -1,4 +1,5 @@
 #include <linux/in.h>
+#include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
 
@@ -9,8 +10,9 @@
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 
-static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
-			u8 const *ha, unsigned ha_len)
+static struct hwaddr_entry * hwaddr_create_slow(struct net_device const *dev,
+			__be32 remote, __be32 local, u8 const *ha,
+			unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
 
@@ -22,7 +24,7 @@ static struct hwaddr_entry * hwaddr_create_slow(__be32 remote, __be32 local,
 		return entry;
 	}
 
-	entry = hwaddr_alloc(remote, local, ha, ha_len);
+	entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
 	if (entry)
 		hash_add_rcu(hwaddr_hash_table, &entry->h_node, remote);
 	spin_unlock(&hwaddr_hash_table_lock);
@@ -62,8 +64,8 @@ static void hwaddr_entry_free_callback(struct rcu_head *head)
 }
 
 
-void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len)
+void hwaddr_update(struct net_device const *dev, __be32 remote, __be32 local,
+			u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *new_entry = NULL;
 	struct hwaddr_entry *entry = NULL;
@@ -71,22 +73,16 @@ void hwaddr_update(__be32 remote, __be32 local, u8 const *ha,
 	rcu_read_lock();
 	entry = hwaddr_lookup(remote, local);
 	if (!entry)
-		entry = hwaddr_create_slow(remote, local, ha, ha_len);
+		entry = hwaddr_create_slow(dev, remote, local, ha, ha_len);
 
-	if (entry)
+	if (entry && (entry->h_ha_len != ha_len ||
+				memcmp(entry->h_ha, ha, ha_len)))
 	{
-		if (entry->h_ha_len != ha_len ||
-					memcmp(entry->h_ha, ha, ha_len))
-		{
-			pr_debug("update entry for remote %pI4"
-						"and local %pI4\n",
-						&entry->h_remote,
-						&entry->h_local);
-			
-			new_entry = hwaddr_alloc(remote, local, ha, ha_len);
-			hlist_replace_rcu(&entry->h_node, &new_entry->h_node);
-			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
-		}
+		pr_debug("update entry for remote %pI4 and local %pI4\n",
+					&entry->h_remote, &entry->h_local);	
+		new_entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
+		hlist_replace_rcu(&entry->h_node, &new_entry->h_node);
+		call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
 	}
 	rcu_read_unlock();
 }

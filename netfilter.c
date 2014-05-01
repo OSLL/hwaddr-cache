@@ -39,7 +39,7 @@ static unsigned int hwaddr_in_hook_fn(struct nf_hook_ops const *ops,
 	nhdr = ip_hdr(skb);
 	target = __ip_dev_find(dev_net(in), nhdr->daddr, false);
 	if (target == in)
-		hwaddr_update(nhdr->saddr, nhdr->daddr, lhdr->h_source,
+		hwaddr_update(in, nhdr->saddr, nhdr->daddr, lhdr->h_source,
 					ETH_ALEN);
 
 	return NF_ACCEPT;
@@ -75,25 +75,12 @@ static void hwaddr_ensure_neigh(struct rtable *rt, struct hwaddr_entry *entry)
 	neigh_update(neigh, entry->h_ha, NUD_NOARP, NEIGH_UPDATE_F_OVERRIDE);
 }
 
-static struct rtable *hwaddr_update_route(struct sk_buff *skb,
-			struct net_device const *out,
-			struct hwaddr_entry *entry)
+static void hwaddr_update_route(struct sk_buff *skb, struct hwaddr_entry *entry)
 {
-	struct iphdr const *const nhdr = ip_hdr(skb);
-	struct rtable *const rt = ip_route_output(dev_net(out), nhdr->daddr,
-				nhdr->saddr, nhdr->tos | RTO_ONLINK,
-				out->ifindex);
-
-	if (!IS_ERR_OR_NULL(rt))
-	{
-		dst_hold(&rt->dst);
-		skb_dst_drop(skb);
-		skb_dst_set(skb, &rt->dst);
-		hwaddr_ensure_neigh(rt, entry);
-		return rt;
-	}
-
-	return NULL;
+	dst_hold(&entry->h_route->dst);
+	skb_dst_drop(skb);
+	skb_dst_set(skb, &entry->h_route->dst);
+	hwaddr_ensure_neigh(entry->h_route, entry);
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
@@ -117,11 +104,9 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	rcu_read_lock();
-
 	entry = hwaddr_lookup(nhdr->daddr, nhdr->saddr);
-	if (entry && !hwaddr_update_route(skb, target, entry))
-		pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
-
+	if (entry)
+		hwaddr_update_route(skb, entry);
 	rcu_read_unlock();
 
 	dev_put(target);
