@@ -117,13 +117,11 @@ static unsigned int hwaddr_out_hook_fn(struct nf_hook_ops const *ops,
 		return NF_ACCEPT;
 
 	rcu_read_lock();
+
 	entry = hwaddr_lookup(nhdr->daddr, nhdr->saddr);
-	if (entry)
-	{
-		if (!hwaddr_update_route(skb, target, entry))
-			pr_warn("cannot reroute packet to %pI4\n",
-						&nhdr->daddr);
-	}
+	if (entry && !hwaddr_update_route(skb, target, entry))
+		pr_warn("cannot reroute packet to %pI4\n", &nhdr->daddr);
+
 	rcu_read_unlock();
 
 	dev_put(target);
