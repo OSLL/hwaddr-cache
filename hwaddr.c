@@ -45,7 +45,6 @@ struct hwaddr_entry *hwaddr_alloc(__be32 remote, __be32 local, u8 const *ha,
 	if (!entry)
 		return NULL;
 
-	rwlock_init(&entry->h_lock);
 	atomic_long_set(&entry->h_stamp, (long)get_seconds());
 	atomic_set(&entry->h_refcnt, 0);
 	init_hwaddr_entry(entry, ha, ha_len);
