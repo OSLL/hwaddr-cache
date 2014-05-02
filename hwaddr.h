@@ -3,7 +3,6 @@
 
 #include <linux/inetdevice.h>
 #include <linux/kernel.h>
-#include <linux/rwlock.h>
 #include <linux/string.h>
 
 #define HW_PERSIST	0x01
