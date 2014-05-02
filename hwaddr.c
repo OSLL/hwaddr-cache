@@ -61,9 +61,12 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 
 	atomic_long_set(&entry->h_stamp, (long)get_seconds());
 	atomic_set(&entry->h_refcnt, 0);
-	init_hwaddr_entry(entry, ha, ha_len);
+	memcpy(entry->h_ha, ha, ha_len);
+
+	entry->h_ha_len = ha_len;
 	entry->h_remote = remote;
 	entry->h_local = local;
+
 	entry->h_route = hwaddr_create_route(dev, remote, local);
 	if (!entry->h_route)
 	{
