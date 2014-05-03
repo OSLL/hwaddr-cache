@@ -23,7 +23,7 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 	unsigned long const inactive = get_seconds() -
 			(unsigned long)atomic_long_read(&entry->h_stamp);
 	int const refs = atomic_read(&entry->h_refcnt);
-
+	if (node==NULL) return;
         if (node->ifa->ifa_local!=entry->h_local) return;
 
 	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
@@ -32,6 +32,8 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 
 static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
 {
+	seq_printf(sf, "%15s  %15s  %17s  %5s  %10s\n", "local ip", "remote ip",
+				"mac address", "refcnt", "inactive");
         hwaddr_foreach(hwaddr_show_ifa_cache_entry, sf);
         return 0;
 }
@@ -57,7 +59,7 @@ static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
         node_current = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
         node_current->dir_entry = proc_mkdir(buffer, proc_info_root);
         node_current->ifa = ifa;
-        proc_create_data("cache", 0, node_current->dir_entry, &hwaddr_ifa_cache_ops, NULL);
+        proc_create_data("cache", 0, node_current->dir_entry, &hwaddr_ifa_cache_ops, node_current);
 
         list_add(&node_current->list, &dir_list);
 }
