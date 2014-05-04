@@ -20,14 +20,15 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 {
         struct seq_file *sf = (struct seq_file *)data;
         struct dir_list_node *node = (struct dir_list_node *)sf->private;
-	unsigned long const inactive = get_seconds() -
-			(unsigned long)atomic_long_read(&entry->h_stamp);
-	int const refs = atomic_read(&entry->h_refcnt);
-	if (node==NULL) return;
+	unsigned long inactive;
+	int refs;
+	
         if (node->ifa->ifa_local!=entry->h_local) return;
-
-	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local,
-				&entry->h_remote, entry->h_ha, refs, inactive);
+	
+	inactive = get_seconds() - (unsigned long)atomic_long_read(&entry->h_stamp);
+	refs = atomic_read(&entry->h_refcnt);
+	seq_printf(sf, "%15pI4  %15pI4  %pM  %5d  %10lu\n", &entry->h_local, 
+		   &entry->h_remote, entry->h_ha, refs, inactive);
 }
 
 static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
@@ -54,7 +55,7 @@ static struct file_operations const hwaddr_ifa_cache_ops = {
 static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
         struct dir_list_node *node_current = NULL;
 	char buffer[17];
-        sprintf(buffer,"%pI4", &ifa->ifa_local);
+        sprintf(buffer, "%pI4", &ifa->ifa_local);
 	
         node_current = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
         node_current->dir_entry = proc_mkdir(buffer, proc_info_root);
@@ -77,8 +78,7 @@ static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
                         break;
 		}
 	}
-	
-        sprintf(buff,"%pI4", &ifa->ifa_local);
+        sprintf(buff, "%pI4", &ifa->ifa_local);
         remove_proc_entry(buff, proc_info_root);
 }
 
