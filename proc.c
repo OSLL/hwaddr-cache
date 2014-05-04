@@ -24,7 +24,7 @@ static void hwaddr_show_ifa_cache_entry(struct hwaddr_entry *entry, void *data)
 	unsigned long inactive;
 	int refs;
 	
-        if (node->ifa->ifa_local!=entry->h_local) return;
+        if (node->ifa->ifa_local != entry->h_local) return;
 	
 	inactive = get_seconds() - (unsigned long)atomic_long_read(&entry->h_stamp);
 	refs = atomic_read(&entry->h_refcnt);
@@ -75,7 +75,7 @@ static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa)
 	list_for_each_safe(entry, temp, &dir_list)
 	{
 		node = list_entry(entry, struct dir_list_node, list);
-		if (node->ifa==ifa)
+		if (node->ifa == ifa)
 		{
 			list_del(entry);
 			remove_proc_entry("cache", node->dir_entry);
