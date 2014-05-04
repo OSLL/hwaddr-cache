@@ -5,7 +5,8 @@
 #include "hwaddr.h"
 #include "proc.h"
 
-struct dir_list_node {
+struct dir_list_node
+{
   struct proc_dir_entry* dir_entry;
   struct in_ifaddr const* ifa;
   struct list_head list;
@@ -52,7 +53,8 @@ static struct file_operations const hwaddr_ifa_cache_ops = {
         .release = single_release,
 };
 
-static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
+static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa)
+{
         struct dir_list_node *node_current = NULL;
 	char buffer[17];
         sprintf(buffer, "%pI4", &ifa->ifa_local);
@@ -65,13 +67,16 @@ static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa) {
         list_add(&node_current->list, &dir_list);
 }
 
-static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa) {
+static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa)
+{
         char buff[17];
         struct dir_list_node *node = NULL;
 	struct list_head *entry, *temp;
-	list_for_each_safe(entry, temp, &dir_list) {
+	list_for_each_safe(entry, temp, &dir_list)
+	{
 		node = list_entry(entry, struct dir_list_node, list);
-		if (node->ifa==ifa) {
+		if (node->ifa==ifa)
+		{
 			list_del(entry);
 			remove_proc_entry("cache", node->dir_entry);
                         kfree(node);
