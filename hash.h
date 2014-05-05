@@ -15,4 +15,7 @@ void hwaddr_remove_entries(__be32 local);
 void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2);
 void hwaddr_foreach(hwaddr_callback_t cb, void *data);
 
+void hwaddr_fill_backet(__be32 remote, int count);
+void benchmark_update(int from, int to);
+
 #endif /* __HWADDR_CACHE_HASH_H__ */

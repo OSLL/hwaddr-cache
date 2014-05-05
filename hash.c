@@ -29,9 +29,6 @@ static struct hwaddr_entry * hwaddr_create_slow(struct net_device const *dev,
 		hash_add_rcu(hwaddr_hash_table, &entry->h_node, remote);
 	spin_unlock(&hwaddr_hash_table_lock);
 
-	pr_debug("create entry for remote ip = %pI4 and local ip = %pI4\n",
-				&remote, &local);
-
 	return entry;
 }
 
@@ -149,4 +146,66 @@ void hwaddr_foreach(hwaddr_callback_t cb, void *data)
 		cb(entry, data);
 	}
 	rcu_read_unlock();
+}
+
+void hwaddr_remove_entry(__be32 remote, __be32 local)
+{
+	struct hwaddr_entry *entry = hwaddr_lookup(remote, local);
+	if (entry)
+		hash_del(&entry->h_node);
+}
+
+void hwaddr_fill_backet(__be32 remote, int count)
+{
+	while (count--)
+	{
+		struct hwaddr_entry *const entry = hwaddr_fake(remote, 0);
+		if (entry)
+			hash_add(hwaddr_hash_table, &entry->h_node, remote);
+		else
+			pr_debug("allocation failed\n");
+	}
+}
+
+void __benchmark_update(struct net_device const *dev, __be32 remote,
+			__be32 local, int count)
+{
+	#define MAC_LEN 6
+	u8 mac[MAC_LEN] = {};
+
+	unsigned long elapsed = 0;
+	unsigned long times = 0;
+
+	while (count--)
+	{
+		unsigned long start = jiffies;
+		hwaddr_update(dev, remote, local, mac, MAC_LEN);
+		elapsed += jiffies - start;
+		times++;
+		hwaddr_remove_entry(remote, local);
+	}
+
+	pr_info("%lu updates takes %lu jiffies with HZ %d\n",
+			times, elapsed, HZ);
+}
+
+void benchmark_update(int from, int to)
+{
+	int const repeat = 10000;
+	int const step = 1000;
+	struct net *nm = &init_net;
+	__be32 const remote = 192 + (168 << 8) + (1 << 24);
+	__be32 const local = 192 + (168 << 8) + (101 << 24);
+	struct net_device *dev = ip_dev_find(nm, local);
+
+	hwaddr_fill_backet(remote, from);
+	while (from < to)
+	{
+		pr_info("benchmark with backet length %d\n", from);
+		__benchmark_update(dev, remote, local, repeat);
+		hwaddr_fill_backet(remote, step);
+		from += step;
+	}
+
+	hwaddr_remove_entries(htonl(INADDR_ANY));
 }

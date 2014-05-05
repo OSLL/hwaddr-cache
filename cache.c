@@ -45,45 +45,51 @@ static void hwaddr_gc_fini(void)
 
 static int __init hwaddr_cache_init(void)
 {
-	int rc = hwaddr_proc_create();
-	if (rc)
-	{
-		pr_err("cannot create proc directory\n");
-		return rc;
-	}
+//	int rc = hwaddr_proc_create();
+//	if (rc)
+//	{
+//		pr_err("cannot create proc directory\n");
+//		return rc;
+//	}
 
-	rc = hwaddr_slab_create();
-	if (rc)
-	{
-		pr_err("cannot create slab cache\n");
-		hwaddr_proc_destroy();
-		return rc;
-	}
+//	rc = hwaddr_slab_create();
+//	if (rc)
+//	{
+//		pr_err("cannot create slab cache\n");
+//		hwaddr_proc_destroy();
+//		return rc;
+//	}
 
-	rc = hwaddr_register_hooks();
-	if (rc)
-	{
-		pr_err("cannot register netfilter hooks\n");
-		hwaddr_proc_destroy();
-		hwaddr_slab_destroy();
-		return rc;
-	}
+//	rc = hwaddr_register_hooks();
+//	if (rc)
+//	{
+//		pr_err("cannot register netfilter hooks\n");
+//		hwaddr_proc_destroy();
+//		hwaddr_slab_destroy();
+//		return rc;
+//	}
 
-	hwaddr_gc_init();
+//	hwaddr_gc_init();
 
-	pr_debug("hwaddr-cache module loaded\n");
+	hwaddr_slab_create();
+	pr_info("start bench\n");
+	benchmark_update(0, 10000);
+	pr_info("finish bench\n");
+	hwaddr_slab_destroy();
+
+//	pr_debug("hwaddr-cache module loaded\n");
 	return 0;
 }
 
 static void __exit hwaddr_cache_cleanup(void)
 {
-	hwaddr_gc_fini();
+//	hwaddr_gc_fini();
 
-	hwaddr_unregister_hooks();
-	hwaddr_slab_destroy();
-	hwaddr_proc_destroy();
+//	hwaddr_unregister_hooks();
+//	hwaddr_slab_destroy();
+//	hwaddr_proc_destroy();
 
-	pr_debug("hwaddr-cache module unloaded\n");
+//	pr_debug("hwaddr-cache module unloaded\n");
 }
 
 module_init(hwaddr_cache_init);

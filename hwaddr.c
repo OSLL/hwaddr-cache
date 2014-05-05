@@ -28,9 +28,8 @@ int hwaddr_slab_create(void)
 
 void hwaddr_free(struct hwaddr_entry *entry)
 {
-	pr_debug("freeing entry for %pI4\n", &entry->h_remote);
-
-	dst_release(&entry->h_route->dst);
+	if (entry->h_route)
+		dst_release(&entry->h_route->dst);
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
@@ -73,6 +72,21 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 		pr_warn("cannot create route for %pI4\n", &remote);
 		kmem_cache_free(hwaddr_cache, entry);
 		return NULL;
+	}
+
+	return entry;
+}
+
+struct hwaddr_entry *hwaddr_fake(__be32 remote, __be32 local)
+{
+	struct hwaddr_entry *entry = (struct hwaddr_entry *)
+				kmem_cache_zalloc(hwaddr_cache, GFP_KERNEL);
+
+	if (entry)
+	{
+		entry->h_local = local;
+		entry->h_remote = remote;
+		entry->h_ha_len = 6;
 	}
 
 	return entry;
