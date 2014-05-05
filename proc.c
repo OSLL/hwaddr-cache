@@ -1,6 +1,7 @@
+#include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
-#include <linux/list.h>
+
 #include "hash.h"
 #include "hwaddr.h"
 #include "proc.h"
@@ -43,9 +44,18 @@ static int hwaddr_show_ifa_cache(struct seq_file *sf, void *unused)
 	return 0;
 }
 
+static struct dir_list_node *DLN(struct inode const *inode)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
+	return (struct dir_list_node *)PDE(inode)->data;
+#else
+	return (struct dir_list_node *)PDE_DATA(inode);
+#endif
+}
+
 static int hwaddr_ifa_cache_open(struct inode *inode, struct file *file)
 {
-	struct dir_list_node *node = (struct dir_list_node*)PDE_DATA(inode);
+	struct dir_list_node *node = DLN(inode);
 	return single_open(file, hwaddr_show_ifa_cache, node);
 }
 
