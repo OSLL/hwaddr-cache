@@ -173,18 +173,20 @@ void __benchmark_update(struct net_device const *dev, __be32 remote,
 	#define MAC_LEN 6
 	u8 mac[MAC_LEN] = {};
 
-	unsigned long start = jiffies;
+	unsigned long long elapsed = 0;
 	unsigned long times = 0;
 
 	while (count--)
 	{
+		unsigned long long start = ktime_to_ns(ktime_get());
 		hwaddr_update(dev, remote, local, mac, MAC_LEN);
+		elapsed += (ktime_to_ns(ktime_get()) - start);
+
 		hwaddr_remove_entry(remote, local);
 		times++;
 	}
 
-	pr_info("%lu updates takes %lu jiffies with HZ %d\n",
-			times, jiffies - start, HZ);
+	pr_info("%lu updates takes %llu ns\n", times, elapsed);
 }
 
 void benchmark_update(int from, int to)
@@ -197,7 +199,7 @@ void benchmark_update(int from, int to)
 	struct net_device *dev = ip_dev_find(nm, local);
 
 	hwaddr_fill_backet(remote, from);
-	while (from < to)
+	while (from <= to)
 	{
 		pr_info("benchmark with backet length %d\n", from);
 		__benchmark_update(dev, remote, local, repeat);
