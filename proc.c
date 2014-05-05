@@ -56,24 +56,31 @@ static struct file_operations const hwaddr_ifa_cache_ops = {
 	.release = single_release,
 };
 
+#define IP_MAX_LEN	16
+
 static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa)
 {
-	struct dir_list_node *node = NULL;
-	char buffer[17];
+	char buffer[IP_MAX_LEN];
+	struct dir_list_node *node = kmalloc((sizeof(struct dir_list_node)),
+				GFP_KERNEL);
 
-	node_current = kmalloc((sizeof(struct dir_list_node)), GFP_KERNEL);
+	if (!node)
+	{
+		pr_warn("cannot allocate ifa descriptor\n");
+		return;
+	}
 
 	sprintf(buffer, "%pI4", &ifa->ifa_local);
 	node->dir_entry = proc_mkdir(buffer, proc_info_root);
 	node->ifa = ifa;
-	proc_create_data("cache", 0, node_current->dir_entry,
-				&hwaddr_ifa_cache_ops, node);
-	list_add(&node_current->list, &dir_list);
+	proc_create_data("cache", 0, node->dir_entry, &hwaddr_ifa_cache_ops,
+				node);
+	list_add(&node->list, &dir_list);
 }
 
 static void hwaddr_ifa_folder_remove(struct in_ifaddr const* const ifa)
 {
-	char buff[17];
+	char buff[IP_MAX_LEN];
 	struct dir_list_node *node = NULL;
 	struct list_head *entry = NULL, *temp = NULL;
 
