@@ -173,20 +173,18 @@ void __benchmark_update(struct net_device const *dev, __be32 remote,
 	#define MAC_LEN 6
 	u8 mac[MAC_LEN] = {};
 
-	unsigned long elapsed = 0;
+	unsigned long start = jiffies;
 	unsigned long times = 0;
 
 	while (count--)
 	{
-		unsigned long start = jiffies;
 		hwaddr_update(dev, remote, local, mac, MAC_LEN);
-		elapsed += jiffies - start;
-		times++;
 		hwaddr_remove_entry(remote, local);
+		times++;
 	}
 
 	pr_info("%lu updates takes %lu jiffies with HZ %d\n",
-			times, elapsed, HZ);
+			times, jiffies - start, HZ);
 }
 
 void benchmark_update(int from, int to)
