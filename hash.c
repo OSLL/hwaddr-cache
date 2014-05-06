@@ -10,29 +10,47 @@
 static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
 static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
 
-static struct hwaddr_entry * hwaddr_create_slow(struct net_device const *dev,
-			__be32 remote, __be32 local, u8 const *ha,
-			unsigned ha_len)
+
+static void hwaddr_entry_free_callback(struct rcu_head *head)
 {
-	struct hwaddr_entry *entry = NULL;
+	hwaddr_free(container_of(head, struct hwaddr_entry, h_rcu));
+}
+
+
+static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
+			__be32 local, u8 const *ha, unsigned ha_len)
+{
+	struct hwaddr_entry *entry = NULL, *new_entry = NULL;
 
 	spin_lock(&hwaddr_hash_table_lock);
+
 	entry = hwaddr_lookup(remote, local);
-	if (entry)
+	if (entry && entry->h_ha_len == ha_len &&
+				!memcmp(entry->h_ha, ha, ha_len))
 	{
 		spin_unlock(&hwaddr_hash_table_lock);
 		return entry;
 	}
 
-	entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
-	if (entry)
-		hash_add_rcu(hwaddr_hash_table, &entry->h_node, remote);
+	new_entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
+	if (new_entry)
+	{
+		if (entry)
+		{
+			hlist_replace_rcu(&entry->h_node, &new_entry->h_node);
+			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
+		}
+		else
+			hash_add_rcu(hwaddr_hash_table, &new_entry->h_node,
+						remote);
+	}
+
 	spin_unlock(&hwaddr_hash_table_lock);
 
 	pr_debug("create entry for remote ip = %pI4 and local ip = %pI4\n",
 				&remote, &local);
 
-	return entry;
+	return new_entry;
 }
 
 
@@ -58,32 +76,16 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 }
 
 
-static void hwaddr_entry_free_callback(struct rcu_head *head)
-{
-	hwaddr_free(container_of(head, struct hwaddr_entry, h_rcu));
-}
-
-
 void hwaddr_update(struct net_device const *dev, __be32 remote, __be32 local,
 			u8 const *ha, unsigned ha_len)
 {
-	struct hwaddr_entry *new_entry = NULL;
 	struct hwaddr_entry *entry = NULL;
 	
 	rcu_read_lock();
 	entry = hwaddr_lookup(remote, local);
-	if (!entry)
-		entry = hwaddr_create_slow(dev, remote, local, ha, ha_len);
-
-	if (entry && (entry->h_ha_len != ha_len ||
-				memcmp(entry->h_ha, ha, ha_len)))
-	{
-		pr_debug("update entry for remote %pI4 and local %pI4\n",
-					&entry->h_remote, &entry->h_local);	
-		new_entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
-		hlist_replace_rcu(&entry->h_node, &new_entry->h_node);
-		call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
-	}
+	if (!entry || entry->h_ha_len != ha_len ||
+				memcmp(entry->h_ha, ha, ha_len))
+		hwaddr_create_slow(dev, remote, local, ha, ha_len);
 	rcu_read_unlock();
 }
 
