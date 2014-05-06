@@ -29,7 +29,7 @@ static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
 				!memcmp(entry->h_ha, ha, ha_len))
 	{
 		spin_unlock(&hwaddr_hash_table_lock);
-		return entry;
+		return;
 	}
 
 	new_entry = hwaddr_alloc(dev, remote, local, ha, ha_len);
@@ -47,10 +47,8 @@ static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
 
 	spin_unlock(&hwaddr_hash_table_lock);
 
-	pr_debug("create entry for remote ip = %pI4 and local ip = %pI4\n",
+	pr_debug("update entry for remote ip = %pI4 and local ip = %pI4\n",
 				&remote, &local);
-
-	return new_entry;
 }
 
 
