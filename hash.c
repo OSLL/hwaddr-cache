@@ -63,7 +63,6 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 		if (entry->h_remote == remote && entry->h_local == local)
 		{
 			atomic_long_set(&entry->h_stamp, (long)get_seconds());
-			rcu_read_unlock();
 			return entry;
 		}
 	}
