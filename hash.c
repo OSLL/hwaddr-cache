@@ -57,7 +57,6 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
 
-	rcu_read_lock();
 	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list,
 				h_node, remote)
 	{
@@ -68,7 +67,6 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 			return entry;
 		}
 	}
-	rcu_read_unlock();
 
 	return NULL;
 }
