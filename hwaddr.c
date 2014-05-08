@@ -57,7 +57,10 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 	entry = (struct hwaddr_entry *)kmem_cache_zalloc(hwaddr_cache,
 				GFP_ATOMIC);
 	if (!entry)
+	{
+		pr_warn("cannot allocate hwaddr_entry\n");
 		return NULL;
+	}
 
 	atomic_long_set(&entry->h_stamp, (long)get_seconds());
 	atomic_set(&entry->h_refcnt, 0);
