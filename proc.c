@@ -76,7 +76,7 @@ static void hwaddr_ifa_folder_create(struct in_ifaddr const* const ifa)
 
 	if (!node)
 	{
-		pr_warn("cannot allocate ifa descriptor\n");
+		pr_warn("hwaddr-cache: cannot allocate ifa descriptor\n");
 		return;
 	}
 
@@ -221,20 +221,20 @@ static long hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
 
 	if (_IOC_TYPE(cmd) != HWADDR_IOC_MAGIC)
 	{
-		pr_warn("hwaddr-cache do not know this ioctl\n");
+		pr_warn("hwaddr-cache: do not know this ioctl\n");
 		return -EINVAL;
 	}
 
 	if (copy_from_user(&request, (void const *)arg, sizeof(request)))
 	{
-		pr_warn("hwaddr-cache cannot copy data\n");
+		pr_warn("hwaddr-cache: cannot copy data\n");
 		return -EINVAL;
 	}
 
 	entry = hwaddr_lookup(request.remote.s_addr, request.local.s_addr);
 	if (!entry)
 	{
-		pr_warn("hwaddr-cache cannot find such entry\n");
+		pr_warn("hwaddr-cache: cannot find such entry\n");
 		return -EINVAL;
 	}
 
@@ -245,10 +245,10 @@ static long hwaddr_ioctl(struct file *fp, unsigned cmd, unsigned long arg)
 		break;
 	case HWADDR_ENTRY_UNREF:
 		if (atomic_dec_return(&entry->h_refcnt) < 0)
-			pr_warn("hwaddr-cache decremented zero\n");
+			pr_warn("hwaddr-cache: decremented zero\n");
 		break;
 	default:
-		pr_warn("hwaddr-cache do not support this ioctl\n");
+		pr_warn("hwaddr-cache: do not support this ioctl\n");
 		return 1;
 	}
 	return 0;

@@ -21,14 +21,17 @@ int hwaddr_slab_create(void)
 				SLAB_HWCACHE_ALIGN, NULL);
 
 	if (!hwaddr_cache)
+	{
+		pr_err("hwaddr-cache: cannot create entry cache\n");
 		return -ENOMEM;
+	}
 
 	return 0;
 }
 
 void hwaddr_free(struct hwaddr_entry *entry)
 {
-	pr_debug("freeing entry for %pI4\n", &entry->h_remote);
+	pr_debug("hwaddr-cache: freeing entry for %pI4\n", &entry->h_remote);
 
 	dst_release(&entry->h_route->dst);
 	kmem_cache_free(hwaddr_cache, entry);
@@ -43,6 +46,8 @@ static struct rtable* hwaddr_create_route(struct net_device const *dev,
 	if (!IS_ERR_OR_NULL(rt))
 		return rt;
 
+	pr_warn("hwaddr-cache: cannor create route from %pI4 to %pI4\n",
+				&local, &remote);
 	return NULL;
 }
 
@@ -52,13 +57,16 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 	struct hwaddr_entry *entry = NULL;
 
 	if (ha_len > MAX_ADDR_LEN)
+	{
+		pr_err("hwaddr-cache: link layer address is too long\n");
 		return NULL;
+	}
 
 	entry = (struct hwaddr_entry *)kmem_cache_zalloc(hwaddr_cache,
 				GFP_ATOMIC);
 	if (!entry)
 	{
-		pr_warn("cannot allocate hwaddr_entry\n");
+		pr_warn("hwaddr-cache: cannot allocate hwaddr_entry\n");
 		return NULL;
 	}
 
@@ -73,7 +81,6 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 	entry->h_route = hwaddr_create_route(dev, remote, local);
 	if (!entry->h_route)
 	{
-		pr_warn("cannot create route for %pI4\n", &remote);
 		kmem_cache_free(hwaddr_cache, entry);
 		return NULL;
 	}

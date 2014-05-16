@@ -47,8 +47,8 @@ static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
 
 	spin_unlock(&hwaddr_hash_table_lock);
 
-	pr_debug("update entry for remote ip = %pI4 and local ip = %pI4\n",
-				&remote, &local);
+	pr_debug("hwaddr-cache: update entry for remote ip = %pI4 and "
+				"local ip = %pI4\n", &remote, &local);
 }
 
 
