@@ -7,29 +7,20 @@
 
 struct hwaddr_common
 {
+};
+
+struct hwaddr_entry
+{
 	struct rcu_head		h_rcu;
 	struct hlist_node	h_node;
 
 	atomic_long_t		h_stamp;
 	atomic_t		h_refcnt;
+
 	struct rtable*		h_route;
+
 	unsigned		h_ha_len;
 	u8			h_ha[ALIGN(MAX_ADDR_LEN, sizeof(long))];
-};
-
-struct hwaddr_entry
-{
-	struct hwaddr_common	common;
-
-	#define h_rcu		common.h_rcu
-	#define h_node		common.h_node
-
-	#define h_stamp		common.h_stamp
-	#define h_refcnt	common.h_refcnt
-	#define h_route		common.h_route
-	#define h_ha_len	common.h_ha_len
-	#define h_ha		common.h_ha
-
 	__be32			h_local;
 	__be32			h_remote;
 };
