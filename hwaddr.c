@@ -37,8 +37,8 @@ void hwaddr_free(struct hwaddr_entry *entry)
 	kmem_cache_free(hwaddr_cache, entry);
 }
 
-static struct rtable* hwaddr_create_route(struct net_device const *dev,
-			__be32 remote, __be32 local)
+struct rtable* hwaddr_create_route(struct net_device const *dev, __be32 remote,
+			__be32 local)
 {
 	struct rtable *rt = ip_route_output(dev_net(dev), remote, local,
 				RTO_ONLINK, dev->ifindex);

@@ -28,4 +28,7 @@ void hwaddr_free(struct hwaddr_entry *entry);
 struct hwaddr_entry *hwaddr_alloc(struct net_device const *dev, __be32 remote,
 			__be32 local, u8 const *ha, unsigned ha_len);
 
+struct rtable *hwaddr_create_route(struct net_device const *dev, __be32 remote,
+			__be32 local);
+
 #endif /*__HWADDR_CACHE_HWADDR_H__*/
