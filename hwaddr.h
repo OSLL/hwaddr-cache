@@ -5,10 +5,6 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 
-struct hwaddr_common
-{
-};
-
 struct hwaddr_entry
 {
 	struct rcu_head		h_rcu;
