@@ -1,10 +1,11 @@
 obj-m += hwaddr-cache.o
-hwaddr-cache-objs := cache.o hash.o hwaddr.o netfilter.o proc.o
+hwaddr-cache-objs := route.o output.o netfilter.o hash.o cache.o proc.o
 
-CFLAGS_cache.o := -DDEBUG
-CFLAGS_hash.o := -DDEBUG
-CFLAGS_hwaddr.o := -DDEBUG
+CFLAGS_route.o := -DDEBUG
+CFLAGS_output.o := -DDEBUG
 CFLAGS_netfilter.o := -DDEBUG
+CFLAGS_hash.o := -DDEBUG
+CFLAGS_cache.o := -DDEBUG
 CFLAGS_proc.o := -DDEBUG
 
 all:

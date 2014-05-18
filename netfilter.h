@@ -1,7 +1,7 @@
-#ifndef __HWADDR_CACHE_NETFILTER_H__
-#define __HWADDR_CACHE_NETFILTER_H__
+#ifndef __HWADDR_NETFILTER_HOOK_H__
+#define __HWADDR_NETFILTER_HOOK_H__
 
-int hwaddr_register_hooks(void);
-void hwaddr_unregister_hooks(void);
+int hwaddr_netfilter_register(void);
+void hwaddr_netfilter_unregister(void);
 
-#endif /*__HWADDR_CACHE_NETFILTER_H__*/
+#endif /*__HWADDR_NETFILTER_HOOK_H__*/

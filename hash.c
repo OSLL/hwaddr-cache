@@ -1,34 +1,23 @@
-#include <linux/in.h>
-#include <linux/netdevice.h>
-#include <linux/spinlock.h>
 #include <linux/string.h>
 
 #include "hash.h"
-#include "hwaddr.h"
 #include "hwaddr-hashtable.h"
+#include "route.h"
 
-static DEFINE_HASHTABLE(hwaddr_hash_table, 16);
-static DEFINE_SPINLOCK(hwaddr_hash_table_lock);
+static DEFINE_HASHTABLE(hwaddr_hashtable, 16);
+static DEFINE_SPINLOCK(hwaddr_hashtable_lock);
 
-
-static void hwaddr_entry_free_callback(struct rcu_head *head)
-{
-	hwaddr_free(container_of(head, struct hwaddr_entry, h_rcu));
-}
-
-
-static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
+static void hwaddr_create_slow(struct net_device *dev, __be32 remote,
 			__be32 local, u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL, *new_entry = NULL;
 
-	spin_lock(&hwaddr_hash_table_lock);
-
+	spin_lock(&hwaddr_hashtable_lock);
 	entry = hwaddr_lookup(remote, local);
 	if (entry && entry->h_ha_len == ha_len &&
 				!memcmp(entry->h_ha, ha, ha_len))
 	{
-		spin_unlock(&hwaddr_hash_table_lock);
+		spin_unlock(&hwaddr_hashtable_lock);
 		return;
 	}
 
@@ -38,26 +27,26 @@ static void hwaddr_create_slow(struct net_device const *dev, __be32 remote,
 		if (entry)
 		{
 			hlist_replace_rcu(&entry->h_node, &new_entry->h_node);
-			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
+			dst_release(&entry->h_dst);
 		}
 		else
-			hash_add_rcu(hwaddr_hash_table, &new_entry->h_node,
+			hash_add_rcu(hwaddr_hashtable, &new_entry->h_node,
 						remote);
 	}
+	spin_unlock(&hwaddr_hashtable_lock);
 
-	spin_unlock(&hwaddr_hash_table_lock);
-
-	pr_debug("hwaddr-cache: update entry for remote ip = %pI4 and "
-				"local ip = %pI4\n", &remote, &local);
+	pr_debug("hwaddr-cache: update entry for remote %pI4 and local %pI4\n",
+				&remote, &local);
 }
-
 
 struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
 
-	hwaddr_hash_for_each_possible_rcu(hwaddr_hash_table, entry, list,
+	(void)list; //supress warning for new kernel version
+
+	hwaddr_hash_for_each_possible_rcu(hwaddr_hashtable, entry, list,
 				h_node, remote)
 	{
 		if (entry->h_remote == remote && entry->h_local == local)
@@ -70,12 +59,11 @@ struct hwaddr_entry *hwaddr_lookup(__be32 remote, __be32 local)
 	return NULL;
 }
 
-
-void hwaddr_update(struct net_device const *dev, __be32 remote, __be32 local,
+void hwaddr_update(struct net_device *dev, __be32 remote, __be32 local,
 			u8 const *ha, unsigned ha_len)
 {
 	struct hwaddr_entry *entry = NULL;
-	
+
 	rcu_read_lock();
 	entry = hwaddr_lookup(remote, local);
 	if (!entry || entry->h_ha_len != ha_len ||
@@ -84,39 +72,17 @@ void hwaddr_update(struct net_device const *dev, __be32 remote, __be32 local,
 	rcu_read_unlock();
 }
 
-
-void hwaddr_remove_entries(__be32 local)
-{
-	__be32 const ANY = htonl(INADDR_ANY);
-
-	struct hwaddr_entry *entry = NULL;
-	struct hlist_node *tmp = NULL;
-	struct hlist_node *list = NULL;
-	int index = 0;
-
-	spin_lock(&hwaddr_hash_table_lock);
-	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
-				h_node)
-	{
-		if ((local == ANY) || (entry->h_local == local))
-		{
-			hash_del_rcu(&entry->h_node);
-			call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
-		}
-	}
-	spin_unlock(&hwaddr_hash_table_lock);
-}
-
-
-void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2)
+void hwaddr_clear_outdated(unsigned long timeout1, unsigned long timeout2)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *tmp = NULL;
 	struct hlist_node *list = NULL;
 	int index = 0;
 
-	spin_lock(&hwaddr_hash_table_lock);
-	hwaddr_hash_for_each_safe(hwaddr_hash_table, index, list, tmp, entry,
+	(void)list; //supress warning for new kernel versions
+
+	spin_lock(&hwaddr_hashtable_lock);
+	hwaddr_hash_for_each_safe(hwaddr_hashtable, index, list, tmp, entry,
 				h_node)
 	{
 		unsigned long const inactive = get_seconds() -
@@ -129,21 +95,42 @@ void hwaddr_remove_old_entries(unsigned long timeout1, unsigned long timeout2)
 			continue;
 
 		hash_del_rcu(&entry->h_node);
-		call_rcu(&entry->h_rcu, hwaddr_entry_free_callback);
+		dst_release(&entry->h_dst);
 	}
-	spin_unlock(&hwaddr_hash_table_lock);
+	spin_unlock(&hwaddr_hashtable_lock);
 }
 
-void hwaddr_foreach(hwaddr_callback_t cb, void *data)
+void hwaddr_clear_cache(void)
+{
+	struct hwaddr_entry *entry = NULL;
+	struct hlist_node *tmp = NULL;
+	struct hlist_node *list = NULL;
+	int index = 0;
+
+	(void)list; //supress warning for new kernel versions
+
+	spin_lock(&hwaddr_hashtable_lock);
+	hwaddr_hash_for_each_safe(hwaddr_hashtable, index, list, tmp, entry,
+				h_node)
+	{
+		hash_del_rcu(&entry->h_node);
+		dst_release(&entry->h_dst);
+	}
+	spin_unlock(&hwaddr_hashtable_lock);
+}
+
+void hwaddr_foreach(hwaddr_hash_callback_t callback, void *data)
 {
 	struct hwaddr_entry *entry = NULL;
 	struct hlist_node *list = NULL;
 	int index = 0;
 
+	(void)list; //supress warning for new kernel versions
+
 	rcu_read_lock();
-	hwaddr_hash_for_each_rcu(hwaddr_hash_table, index, list, entry, h_node)
+	hwaddr_hash_for_each_rcu(hwaddr_hashtable, index, list, entry, h_node)
 	{
-		cb(entry, data);
+		callback(entry, data);
 	}
 	rcu_read_unlock();
 }

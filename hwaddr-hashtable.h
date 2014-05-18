@@ -1,5 +1,5 @@
-#ifndef HWADDR_HASHTABLE_H
-#define HWADDR_HASHTABLE_H
+#ifndef __HWADDR_HASHTABLE_BACKPORT_H__
+#define __HWADDR_HASHTABLE_BACKPORT_H__
 
 #include <linux/version.h>
 
@@ -31,4 +31,4 @@
 
 #endif /*LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)*/
 
-#endif /*HWADDR_HASHTABLE_H*/
+#endif /*__HWADDR_HASHTABLE_BACKPORT_H__*/

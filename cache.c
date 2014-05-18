@@ -4,9 +4,9 @@
 
 #include "cache.h"
 #include "hash.h"
-#include "hwaddr.h"
 #include "netfilter.h"
 #include "proc.h"
+#include "route.h"
 
 static unsigned long hwaddr_persistent_timeout = 120;
 module_param(hwaddr_persistent_timeout, ulong, 0);
@@ -15,29 +15,28 @@ MODULE_PARM_DESC(hwaddr_persistent_timeout,
 
 static unsigned long hwaddr_timeout = 1;
 module_param(hwaddr_timeout, ulong, 0);
-MODULE_PARM_DESC(hwaddr_timeout, "Timeout for hwaddr cache entries");
-
-
+MODULE_PARM_DESC(hwaddr_timeout, "Timeout fot hwaddr cache entries");
 
 static struct delayed_work hwaddr_gc_work;
 
 static void hwaddr_gc_worker(struct work_struct *unused)
 {
-	(void)unused;
+	(void)unused; //supress warning
+
 	pr_debug("hwaddr-cache: starting gc\n");
-	hwaddr_remove_old_entries(hwaddr_timeout * 60,
+	hwaddr_clear_outdated(hwaddr_timeout * 60,
 				hwaddr_persistent_timeout * 60);
-	pr_debug("hwaddr-cache: gc finished\n");
 	schedule_delayed_work(&hwaddr_gc_work, hwaddr_timeout * 60 * HZ);
+	pr_debug("hwaddr-cache: gc finished\n");
 }
 
-static void hwaddr_gc_init(void)
+static void hwaddr_gc_start(void)
 {
 	INIT_DELAYED_WORK(&hwaddr_gc_work, hwaddr_gc_worker);
 	schedule_delayed_work(&hwaddr_gc_work, hwaddr_timeout * 60 * HZ);
 }
 
-static void hwaddr_gc_fini(void)
+static void hwaddr_gc_finish(void)
 {
 	flush_delayed_work(&hwaddr_gc_work);
 	cancel_delayed_work_sync(&hwaddr_gc_work);
@@ -45,31 +44,35 @@ static void hwaddr_gc_fini(void)
 
 static int __init hwaddr_cache_init(void)
 {
-	int rc = hwaddr_proc_create();
+	int rc = 0;
+
+
+	rc = hwaddr_cache_create();
 	if (rc)
 	{
-		pr_err("hwaddr-cache: cannot create proc directory\n");
+		pr_err("hwaddr-cache: cannot create cache\n");
 		return rc;
 	}
 
-	rc = hwaddr_slab_create();
-	if (rc)
-	{
-		pr_err("hwaddr-cache: cannot create slab cache\n");
-		hwaddr_proc_destroy();
-		return rc;
-	}
+	hwaddr_gc_start();
 
-	rc = hwaddr_register_hooks();
+	rc = hwaddr_netfilter_register();
 	if (rc)
 	{
 		pr_err("hwaddr-cache: cannot register netfilter hooks\n");
-		hwaddr_proc_destroy();
-		hwaddr_slab_destroy();
+		hwaddr_cache_destroy();
 		return rc;
 	}
 
-	hwaddr_gc_init();
+	rc = hwaddr_proc_create();
+	if (rc)
+	{
+		pr_err("hwaddr-cache: cannot create proc directory\n");
+		hwaddr_netfilter_unregister();
+		hwaddr_cache_destroy();
+		return rc;
+	}
+
 
 	pr_debug("hwaddr-cache: module loaded\n");
 	return 0;
@@ -77,11 +80,10 @@ static int __init hwaddr_cache_init(void)
 
 static void __exit hwaddr_cache_cleanup(void)
 {
-	hwaddr_gc_fini();
-
-	hwaddr_unregister_hooks();
-	hwaddr_slab_destroy();
 	hwaddr_proc_destroy();
+	hwaddr_netfilter_unregister();
+	hwaddr_gc_finish();
+	hwaddr_cache_destroy();
 
 	pr_debug("hwaddr-cache: module unloaded\n");
 }
