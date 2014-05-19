@@ -70,38 +70,23 @@ static void hwaddr_link_failure(struct sk_buff *skb)
 		dst_set_expires(dst, 0);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
 static void hwaddr_update_pmtu(struct dst_entry *dst, struct sock *sk,
 			struct sk_buff *skb, u32 mtu)
+#else
+static void hwaddr_update_pmtu(struct dst_entry *dst, u32 mtu)
+#endif
 {
-#if 0
-	static int const ip_rt_min_pmtu = 512 + 20 + 20;
-	static int const ip_rt_mtu_expires = 10 * 60 * HZ;
-
-	struct rtable *rt = (struct rtable *)dst;
-#endif
-
-	WARN_ON(1); // we do not update pmtu so far, but provide implemetation
-#if 0
-	if (dst->dev->mtu < mtu)
-		return;
-
-	if (mtu < ip_rt_min_pmtu)
-		mtu = ip_rt_min_pmtu;
-
-	if (rt->rt_pmtu == mtu && time_before(jiffies,
-				dst->expires - ip_rt_mtu_expires / 2))
-		return;
-
-	rt->rt_pmtu = mtu;
-	dst->expires = jiffies + ip_rt_mtu_expires;
-#endif
+	WARN_ON(1);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
 static void hwaddr_redirect(struct dst_entry *dst, struct sock *sk,
 			struct sk_buff *skb)
 {
 	WARN_ON(1);
 }
+#endif
 
 static int hwaddr_local_out(struct sk_buff *skb)
 {
@@ -109,11 +94,14 @@ static int hwaddr_local_out(struct sk_buff *skb)
 	return -EPERM;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
 static struct neighbour *hwaddr_neigh_lookup(struct dst_entry const *dst,
 			struct sk_buff *skb, const void *daddr)
 {
-	return NULL; //wait for netter times
+	WARN_ON(1);
+	return NULL; //wait for better times
 }
+#endif
 
 static struct dst_ops hwaddr_dst_ops = {
 	.family			=	AF_INET,
@@ -131,9 +119,13 @@ static struct dst_ops hwaddr_dst_ops = {
 	.negative_advice	=	hwaddr_negative_advice,
 	.link_failure		=	hwaddr_link_failure,
 	.update_pmtu		=	hwaddr_update_pmtu,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
 	.redirect		=	hwaddr_redirect,
+#endif
 	.local_out		=	hwaddr_local_out,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
 	.neigh_lookup		=	hwaddr_neigh_lookup,
+#endif
 };
 
 static struct kmem_cache *hwaddr_cache;
@@ -173,6 +165,10 @@ void hwaddr_cache_destroy(void)
 	kmem_cache_destroy(hwaddr_cache);
 }
 
+#ifndef DST_OBSOLETE_NONE
+#define DST_OBSOLETE_NONE	0
+#endif
+
 static inline struct hwaddr_entry *__hwaddr_alloc(struct net_device *dev)
 {
 	return dst_alloc(&hwaddr_dst_ops, dev, 1, DST_OBSOLETE_NONE,
@@ -185,15 +181,10 @@ struct hwaddr_entry *hwaddr_alloc(struct net_device *dev, __be32 remote,
 	struct hwaddr_entry *entry = __hwaddr_alloc(dev);
 	struct rtable *rt = &entry->h_rt;
 
-	rt->rt_genid = rt_genid_ipv4(dev_net(dev));
 	rt->rt_flags = 0;
 	rt->rt_type = 0;
-	rt->rt_is_input = 0;
 	rt->rt_iif = 0;
-	rt->rt_pmtu = 0;
 	rt->rt_gateway = 0;
-	rt->rt_uses_gateway = 0;
-	INIT_LIST_HEAD(&rt->rt_uncached);
 
 	rt->dst.output = hwaddr_output;
 

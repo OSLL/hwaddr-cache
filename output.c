@@ -46,6 +46,15 @@ static inline int hwaddr_finish_output2(struct sk_buff *skb)
 	return hwaddr_connected_output(entry, skb);
 }
 
+static inline int hwaddr_skb_dst_mtu(struct sk_buff *skb)
+{
+	struct inet_sock *inet = skb->sk ? inet_sk(skb->sk) : NULL;
+
+	return (inet && inet->pmtudisc == IP_PMTUDISC_PROBE) ?
+				skb_dst(skb)->dev->mtu :
+				dst_mtu(skb_dst(skb));
+}
+
 static int hwaddr_finish_output(struct sk_buff *skb)
 {
 #if defined(CONFIG_XFRM)
@@ -56,7 +65,7 @@ static int hwaddr_finish_output(struct sk_buff *skb)
 	}
 #endif
 
-	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb))
+	if (skb->len > hwaddr_skb_dst_mtu(skb) && !skb_is_gso(skb))
 		return ip_fragment(skb, hwaddr_finish_output2);
 	else
 		return hwaddr_finish_output2(skb);
