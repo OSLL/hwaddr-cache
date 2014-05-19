@@ -30,14 +30,9 @@ static unsigned int hwaddr_default_advmss(struct dst_entry const *dst)
 static unsigned int hwaddr_mtu(struct dst_entry const *dst)
 {
 	static unsigned int const hwaddr_max_mtu = 65535;
+	unsigned int const mtu = dst->dev->mtu;
 
-	struct rtable const *rt = (struct rtable const *)dst;
-	unsigned int const mtu = rt->rt_pmtu;
-
-	if (mtu && time_before_eq(jiffies, rt->dst.expires))
-		return mtu;
-
-	return min_t(unsigned int, dst->dev->mtu, hwaddr_max_mtu);
+	return min_t(unsigned int, mtu, hwaddr_max_mtu);
 }
 
 static u32 *hwaddr_cow_metrics(struct dst_entry *dst, unsigned long old)
@@ -77,13 +72,15 @@ static void hwaddr_link_failure(struct sk_buff *skb)
 static void hwaddr_update_pmtu(struct dst_entry *dst, struct sock *sk,
 			struct sk_buff *skb, u32 mtu)
 {
+#if 0
 	static int const ip_rt_min_pmtu = 512 + 20 + 20;
 	static int const ip_rt_mtu_expires = 10 * 60 * HZ;
 
 	struct rtable *rt = (struct rtable *)dst;
+#endif
 
 	WARN_ON(1); // we do not update pmtu so far, but provide implemetation
-
+#if 0
 	if (dst->dev->mtu < mtu)
 		return;
 
@@ -96,6 +93,7 @@ static void hwaddr_update_pmtu(struct dst_entry *dst, struct sock *sk,
 
 	rt->rt_pmtu = mtu;
 	dst->expires = jiffies + ip_rt_mtu_expires;
+#endif
 }
 
 static void hwaddr_redirect(struct dst_entry *dst, struct sock *sk,
