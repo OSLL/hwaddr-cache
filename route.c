@@ -1,5 +1,6 @@
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <net/dst.h>
 #include <net/icmp.h>
 
@@ -119,7 +120,11 @@ static struct dst_ops hwaddr_dst_ops = {
 	.protocol		=	cpu_to_be16(ETH_P_IP),
 	.check			=	hwaddr_dst_check,
 	.default_advmss		=	hwaddr_default_advmss,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0)
+	.default_mtu		=	hwaddr_mtu,
+#else
 	.mtu			=	hwaddr_mtu,
+#endif
 	.cow_metrics		=	hwaddr_cow_metrics,
 	.destroy		=	hwaddr_dst_destroy,
 	.ifdown			=	hwaddr_ifdown,
