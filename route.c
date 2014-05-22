@@ -166,8 +166,10 @@ void hwaddr_cache_destroy(void)
 
 static inline struct hwaddr_entry *__hwaddr_alloc(struct net_device *dev)
 {
-	return dst_alloc(&hwaddr_dst_ops, dev, 1, DST_OBSOLETE_NONE,
+	void *dst = dst_alloc(&hwaddr_dst_ops, dev, 1, DST_OBSOLETE_NONE,
 				DST_HOST | DST_NOCACHE | DST_NOCOUNT);
+	memset(dst, 0, sizeof(struct hwaddr_entry));
+	return dst;
 }
 
 struct hwaddr_entry *hwaddr_alloc(struct net_device *dev, __be32 remote,
