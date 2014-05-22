@@ -401,9 +401,8 @@ fail:
 
 static int hwaddr_finish_output(struct sk_buff *skb)
 {
-	if ((skb->len > hwaddr_skb_dst_mtu(skb) && !skb_is_gso(skb)) ||
-				(IP6CB(skb)->frag_max_size &&
-				skb->len > IP6CB(skb)->frag_max_size))
+	if ((skb->len > hwaddr_skb_dst_mtu(skb) && !skb_is_gso(skb))
+				|| dst_allfrag(skb_dst(skb)))
 		return hwaddr_fragment(skb, hwaddr_finish_output2);
 	else
 		return hwaddr_finish_output2(skb);
