@@ -62,12 +62,7 @@ static struct dst_entry *hwaddr_negative_advice(struct dst_entry *dst)
 
 static void hwaddr_link_failure(struct sk_buff *skb)
 {
-	struct dst_entry *dst = skb_dst(skb);
-
-	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_HOST_UNREACH, 0);
-
-	if (dst)
-		dst_set_expires(dst, 0);
+	WARN_ON(1);
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0)
