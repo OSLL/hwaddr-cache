@@ -7,6 +7,7 @@
 #include "hash6.h"
 #include "netfilter.h"
 #include "netfilter6.h"
+#include "output6.h"
 #include "proc.h"
 #include "proc6.h"
 #include "route.h"
@@ -97,6 +98,7 @@ static int hwaddr_cache_ipv6_init(void)
 		return rc;
 	}
 
+	hwaddr_initialize_hashidentrnd();
 	rc = hwaddr6_netfilter_register();
 	if (rc)
 	{
