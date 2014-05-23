@@ -20,7 +20,7 @@ static unsigned int hwaddr_input_hook(
 			struct net_device const *out,
 			int (*okfn)(struct sk_buff *))
 {
-	struct net_device *target = NULL;
+	struct net_device *target = (struct net_device *)in;
 	struct ethhdr *llhdr = NULL;
 	struct ipv6hdr *nhdr = NULL;
 
